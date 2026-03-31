@@ -8,13 +8,23 @@ using GLMakie
 using OrderedCollections: OrderedDict
 
 panel = Agrivoltaics.Fixed(panel_dimensions=(1.0, 4.2), inclination=25.0, panel_height=4.0) |> structure
-panel_mesh = refmesh_to_mesh(panel) 
-norms = face_normals(panel_mesh.position, panel_mesh.faces)
+panel_mesh = PlantGeom.refmesh_to_mesh(panel) 
+norms = GeometryBasics.face_normals(panel_mesh.position, panel_mesh.faces)
+
+apv_system = Agrivoltaics.System(
+    panel,
+    panel_mesh,
+    norms,
+    row_spacing=2.0,
+    interrow_spacing=0.1,
+)
+
+ground_coverage_ratio = Agrivoltaics.calculate_gcr(apv_system)
 
 scene_width = 10.0      # m (total scene width including margins)
 scene_height = 10.0      # m (total scene height including margins)
 # Make the scene node:
-scene_mtg = Node(NodeMTG(:/, :Scene, 1, 1))
+scene_mtg = MultiScaleTreeGraph.Node(NodeMTG(:/, :Scene, 1, 1))
 # Set scene dimensions
 scene_mtg.scene_dimensions = (
     Point3(-scene_width/2, 0.0, 0.0),
