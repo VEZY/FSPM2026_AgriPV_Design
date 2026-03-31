@@ -1,7 +1,0 @@
-using SolarPosition, Dates, TimeZones
-using ArchimedLight
-
-obs = Observer(43.61246, 3.87918, 10.0) # Montpellier, France, 10m above sea level
-tz = TimeZone("Europe/Paris")
-zdt = collect(ZonedDateTime(2025, tz):Hour(1):ZonedDateTime(2026, tz))  # Summer solstice noon
-positions = solar_position(obs, zdt)
