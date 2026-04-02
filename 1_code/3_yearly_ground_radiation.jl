@@ -11,15 +11,15 @@ panel = Agrivoltaics.Fixed(panel_dimensions=(1.0, 4.2), inclination=25.0, panel_
 panel_mesh = PlantGeom.refmesh_to_mesh(panel) 
 norms = GeometryBasics.face_normals(panel_mesh.position, panel_mesh.faces)
 
-apv_system = Agrivoltaics.System(
-    panel,
-    panel_mesh,
-    norms,
-    row_spacing=2.0,
-    interrow_spacing=0.1,
-)
+# apv_system = Agrivoltaics.System(
+#     panel,
+#     panel_mesh,
+#     norms,
+#     row_spacing=2.0,
+#     interrow_spacing=0.1,
+# )
 
-ground_coverage_ratio = Agrivoltaics.calculate_gcr(apv_system)
+# ground_coverage_ratio = Agrivoltaics.calculate_gcr(apv_system)
 
 scene_width = 10.0      # m (total scene width including margins)
 scene_height = 10.0      # m (total scene height including margins)

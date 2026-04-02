@@ -38,7 +38,7 @@ version = "1.2.0"
 
 [[deps.Agrivoltaics]]
 deps = ["CoordinateTransformations", "GeometryBasics", "LinearAlgebra", "MultiScaleTreeGraph", "PlantGeom", "Rotations"]
-path = "C:\\Users\\CC268161.INTRA\\.julia\\dev\\Agrivoltaics"
+path = "C:\\Users\\User\\.julia\\dev\\Agrivoltaics"
 uuid = "a76708df-810c-5d94-8c20-3bbd1247032c"
 version = "0.1.0"
 
