@@ -3,25 +3,25 @@ using GLMakie
 using MultiScaleTreeGraph, PlantGeom
 using GeometryBasics
 using CSV, DataFrames
+using CoordinateTransformations, LinearAlgebra, StaticArrays
 
-# meshes = load.(filter(x -> endswith(x, ".obj"), readdir("0_simulations/archicrop/wheat", join=true)))
-obj_files = filter(x -> endswith(x, ".obj"), readdir("0_simulations/archicrop/wheat", join=true))
 
+mesh_wheat = load("0_simulations/archicrop/wheat-blender.obj")
+
+splitted_mesh = split_mesh(GeometryBasics.Mesh(mesh_wheat))
+mesh_wheat[:object] #! use this to index by object id!!
+
+# Map the meshes object ids from the .obj file to the splitted meshes, and scale from cm to m:
+scale = 0.01
 meshes = Dict{String,GeometryBasics.Mesh}()
-for obj_file in obj_files
-    Id = split(split(basename(obj_file), ".")[1], "_")[end]
-    Id in ["10", "12", "25", "27", "42", "8"] && continue
-    # I get this error for those files, so I skip them for now. I don't know how to fix it, but it seems to be a problem with the .obj files themselves, not with the code.
-    # ERROR: Failed to verify normal attribute:
-    # Faces address 6 vertex attributes but only 4 are present.
-    mesh_ = load(obj_file)
-    meshes[Id] = mesh_.mesh
+for (i, obj) in enumerate(mesh_wheat[:object])
+    # i=1; obj = mesh_wheat[:object][i]
+    mesh_ = splitted_mesh[i]
+    c, f = coordinates(mesh_), faces(mesh_)
+    meshes[split(obj, "_")[end]] = GeometryBasics.Mesh(scale * c, f)
 end
 
-# whole_mesh = merge([mesh_ for (id, mesh_) in meshes])
-# mesh(whole_mesh)
-
-mtg = read_mtg("0_simulations/archicrop/wheat/plant_1995-06-24.mtg")
+mtg = read_mtg("0_simulations/archicrop/wheat.mtg")
 
 # Re-attach the geometry to the MTG using the Ids from the .obj files and the MTG attribute
 traverse!(mtg) do node
@@ -33,7 +33,7 @@ traverse!(mtg) do node
     end
 end
 
-# write_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg)
+write_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg)
 
 # Add scene dimensions:
 domain = CSV.read("0_simulations/stics/domain_per_plant.csv", DataFrame)
@@ -54,4 +54,4 @@ mtg[:pos] = Point(0.0, 0.0, 0.0)
 write_ops("0_simulations/archimed/wheat.ops", scene)
 
 # Make a visualization of the plant:
-plantviz(scene)
+plantviz(scene, color=:green)

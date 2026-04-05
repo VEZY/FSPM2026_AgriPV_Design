@@ -13,12 +13,18 @@ using .MakeScene
 
 scene = MakeScene.make_scene(scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, interrow=0.20, panel_dimensions=(1.0, 4.2), panel_inclination=25.0, panel_height=4.00)
 
-f, ax, p = plantviz(scene.mtg, figure=(size=(1080, 720),))
+traverse!(scene.mtg) do node
+    if symbol(node) == :Leaf
+        node[:color] = node[:is_green] == true ? :green : :yellow
+    end
+    symbol(node) == :Stem && (node[:color] = :green)
+    symbol(node) == :Panel && (node[:color] = :black)
+end
 
-save("2_outputs/simple_plant_scene.png", f, update=false, px_per_unit=3.0)
+# f, ax, p = plantviz(scene.mtg, figure=(size=(1080, 720),), color=:color)
+# save("2_outputs/simple_plant_scene.png", f, update=false, px_per_unit=3.0)
 
-models = MakeScene.models()
-
+models = MakeScene.models("wheat")
 
 sky = SkyState(
     135.0,  # sun azimuth in degrees
@@ -42,33 +48,68 @@ function run_archimed(options, sky, scene, models)
     first = compute_first_order(scene, models, turtle, fluxes, options)
     scat = compute_scattering(scene, models, turtle, first, options)
     budget = integrate_light(scene, models, first, scat, options; step_duration_seconds=1800.0)
-    step = LightStepResult(sky, turtle, fluxes, first, scat, budget, Dict{String,Float64}())
+    render_geometry = ArchimedLight.light_render_geometry(scene, models, options)
+    step = LightStepResult(sky, turtle, fluxes, first, scat, budget, Dict{String,Float64}(), render_geometry)
 
     return step
 end
 
-@time step = run_archimed(options, sky, scene, models)
+@time step = run_archimed(options, sky, scene, models) # 30s for the full scene with scattering
 
-# Attach the results to the MTG for visualization:
-attach_light_step!(scene, step; fields=[:incident_par_flux, :absorbed_par_energy, :absorbed_par_flux])
+# # Tiled:
+# tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
+# fig, ax, p = ArchimedLight.lightplot(tiled, step; color=:Ri_PAR_f)
+# save("2_outputs/simple_plant_scene_light_scat_repeated.png", fig, update=false, px_per_unit=3.0)
 
-# Make the plot:
+
+# tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
+
+wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
 begin
     f = Figure(size=(900, 700))
-    # ax = Axis3(f[1, 1], azimuth=0.0)
-    ax = Axis3(f[1, 1], aspect=:data, title="Incident PAR with a simple plant stand and a solar panel")
-    p = plantviz!(
-        ax,
-        scene.mtg;
-        color=:Ri_PAR_f,
-        # color=:Ra_PAR_f,
-        colormap=:thermal,
-        color_missing=:gray85,
+    ax2 = Axis3(
+        f[1, 1],
+        aspect=:data,
+        title="Incident PAR on a scene with fixed solar panels and a wheat crop",
+        xlabel="x (m)",
+        ylabel="y (m)",
+        zlabel="z (m)",
+        # azimuth=0.0
+    )
+    p = ArchimedLight.lightplot!(ax2, tiled, step; color=:Ri_PAR_f, colormap=:thermal)
+
+
+    # Inset axis
+    ax_inset = Axis3(
+        f[1, 1],
+        width=Relative(0.2),
+        height=Relative(0.2),
+        halign=1.0,
+        valign=0.8,
+        aspect=:data,
+        title="Individual wheat plant",
+        # xticklabelsvisible=false,
+        # yticklabelsvisible=false,
+        # zticklabelsvisible=false,
+        xticklabelsize=10,
+        yticklabelsize=10,
+        zticklabelsize=10,
+        xticks=[-0.2, 0.2],
+        yticks=[-0.2, 0.2],
+        xlabel="",
+        ylabel="",
+        zlabel="",
     )
 
-    # ax.show_axis[] = false
-    PlantGeom.colorbar(f[1, 2], p, label="Incident PAR (W m^-2)")
-    f
+    plantviz!(
+        ax_inset,
+        wheat_plant;
+        color=:green,
+    )
+
+    Colorbar(f[1, 2], p, label="Incident PAR (W m⁻²)")
+    # hidedecorations!(ax_inset)
 end
 
-save("2_outputs/simple_plant_scene_light_scat.png", f, update=false, px_per_unit=3.0)
+save("2_outputs/simple_plant_scene_light_scat_repeated_plant.png", f, update=false, px_per_unit=3.0)

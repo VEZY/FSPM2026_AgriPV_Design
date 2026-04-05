@@ -86,6 +86,10 @@ Place the plants in the scene MTG according to the specified design parameters (
 interrow spacing) and add a random rotation to each plant for visual interest.
 """
 function place_plants_in_scene!(; scene_mtg, plant_mtg, intrarow, plants_per_row, interrow, n_plants, random_rotation=5.0)
+
+    @assert !isnothing(plant_mtg[:functional_group]) "The plant MTG must have a :functional_group attribute to be placed in the scene."
+    @assert !isnothing(scene_mtg.scene_dimensions) "The scene MTG must have :scene_dimensions attribute defined to place the plants in the scene."
+
     # Place the plants in rows:
     pmin, _ = scene_mtg.scene_dimensions
     xmin, ymin, zmin = pmin[1], pmin[2], pmin[3]
@@ -104,7 +108,7 @@ function place_plants_in_scene!(; scene_mtg, plant_mtg, intrarow, plants_per_row
             scene=scene_mtg,
             scene_id=1,
             plant_id=i + 1,
-            functional_group="example_plant",
+            functional_group=plant_mtg[:functional_group],
             pos=(x, y, zmin),
             rotation=rot_plant,
         )
@@ -116,13 +120,21 @@ end
 
 Create the scene MTG with the specified design parameters for the plant stand and the solar panel.
 """
-function make_scene(; scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, interrow=0.20, panel_dimensions=(1.0, 4.2), panel_inclination=25.0, panel_height=4.00)
+function make_scene(; scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, interrow=0.20, panel_dimensions=(1.0, 4.2), panel_inclination=25.0, panel_height=4.00, type="wheat")
+    @assert typeof(type) <: AbstractString "Please specify only one plant type for the scene. Options are: 'wheat' or 'example_plant'."
+    @assert type in ["wheat", "example_plant"] "Invalid plant type. Options are: 'wheat' or 'example_plant'."
+
     # Read the solar panel:
     # panel = read_opf("0_simulations/archimed/objects/panel.opf", mtg_type=NodeMTG)
     panel = Agrivoltaics.Fixed(panel_dimensions=panel_dimensions, inclination=panel_inclination, panel_height=panel_height) |> structure
 
     # Make the plant:
-    small_plant = make_simple_plant()
+    if type == "wheat"
+        small_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+    elseif type == "example_plant"
+        small_plant = make_simple_plant()
+    end
+    small_plant[:functional_group] = type
 
     # Make the scene node:
     scene_mtg = Node(NodeMTG(:/, :Scene, 1, 1))
@@ -172,27 +184,11 @@ function make_scene(; scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, inte
     )
 end
 
-function models()
-    prepare_models([
-        GroupModel(
-            "example_plant";
-            types=OrderedDict(
-                "Internode" => TypeModel(
-                    interception=InterceptionModel(
-                        model="Translucent",
-                        transparency=0.0,
-                        optical_properties=OpticalProperties(0.15, 0.90),
-                    ),
-                ),
-                "Leaf" => TypeModel(
-                    interception=InterceptionModel(
-                        model="Translucent",
-                        transparency=0.0,
-                        optical_properties=OpticalProperties(0.15, 0.90),
-                    ),
-                ),
-            ),
-        ),
+function models(type="wheat")
+    @assert typeof(type) <: AbstractString "Please specify only one plant type for the models. Options are: 'wheat' or 'example_plant'."
+    @assert type in ["wheat", "example_plant"] "Invalid plant type. Options are: 'wheat' or 'example_plant'."
+
+    models = [
         GroupModel(
             "pavement";
             types=OrderedDict(
@@ -217,6 +213,56 @@ function models()
                 ),
             ),
         ),
-    ])
+    ]
+
+    if type == "wheat"
+        push!(
+            models,
+            GroupModel(
+                "wheat";
+                types=OrderedDict(
+                    "Stem" => TypeModel(
+                        interception=InterceptionModel(
+                            model="Translucent",
+                            transparency=0.0,
+                            optical_properties=OpticalProperties(0.15, 0.90),
+                        ),
+                    ),
+                    "Leaf" => TypeModel(
+                        interception=InterceptionModel(
+                            model="Translucent",
+                            transparency=0.0,
+                            optical_properties=OpticalProperties(0.15, 0.90),
+                        ),
+                    ),
+                ),
+            )
+        )
+    elseif type == "example_plant"
+        push!(
+            models,
+            GroupModel(
+                "example_plant";
+                types=OrderedDict(
+                    "Internode" => TypeModel(
+                        interception=InterceptionModel(
+                            model="Translucent",
+                            transparency=0.0,
+                            optical_properties=OpticalProperties(0.15, 0.90),
+                        ),
+                    ),
+                    "Leaf" => TypeModel(
+                        interception=InterceptionModel(
+                            model="Translucent",
+                            transparency=0.0,
+                            optical_properties=OpticalProperties(0.15, 0.90),
+                        ),
+                    ),
+                ),
+            )
+        )
+    end
+    prepare_models(models)
 end
-end
+
+end # module
