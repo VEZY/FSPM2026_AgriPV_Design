@@ -61,22 +61,19 @@ end
 
 
 """
-    define_plant_design(scene_dimensions, plant_density, interrow)
+    define_plant_design(panel_y_distance=10.0, plant_density=60.0, interrow=0.20, n_rows=1)
 
-Given the scene dimensions, plant density (plants per m^2) and interrow spacing (m), calculate the intrarow spacing, 
+Given the scene length (distance along the y-axis), plant density (plants per m^2) and interrow spacing (m), calculate the intrarow spacing, 
 number of plants per row, number of rows and total number of plants that can fit in the scene.
 """
-function define_plant_design(scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, interrow=0.20)
-    scene_width, scene_length = scene_dimensions.x, scene_dimensions.y
+function define_plant_design(panel_y_distance=10.0, plant_density=60.0, interrow=0.20, n_rows=1)
     # From density and interrow, derive in-row spacing.
     intrarow = 1.0 / (plant_density * interrow)
-    # Calculate how many plants per row fit in the scene (accounting for one margin on each side)
-    plants_per_row = max(1, scene_width / intrarow)
-    # Calculate how many rows fit in the scene (accounting for one margin on each side)
-    n_rows = max(1, scene_length / interrow)
+    # With half-spacing margins on both sides, fit only full spacing intervals in the scene width.
+    plants_per_row = max(1, floor(Int, panel_y_distance / intrarow) - 1)
     n_plants = plants_per_row * n_rows
 
-    return intrarow, plants_per_row, n_rows, n_plants
+    return intrarow, plants_per_row, n_plants
 end
 
 """
@@ -97,8 +94,9 @@ function place_plants_in_scene!(; scene_mtg, plant_mtg, intrarow, plants_per_row
     for i in 1:n_plants
         col = (i - 1) % plants_per_row
         row = (i - 1) ÷ plants_per_row
-        x = xmin + (col + 1) * intrarow
-        y = ymin + (row + 1) * interrow
+        # Center first plants at half-spacing so scene boundaries sit midway between plants.
+        x = xmin + (row + 0.5) * interrow
+        y = ymin + (col + 0.5) * intrarow
 
         rot_plant = randn() * random_rotation  # Random rotation for visual interest
 
@@ -111,8 +109,11 @@ function place_plants_in_scene!(; scene_mtg, plant_mtg, intrarow, plants_per_row
             functional_group=plant_mtg[:functional_group],
             pos=(x, y, zmin),
             rotation=rot_plant,
+            rebind_scene=false,
         )
     end
+
+    MultiScaleTreeGraph.columnarize!(scene_mtg)
 end
 
 """
@@ -120,7 +121,12 @@ end
 
 Create the scene MTG with the specified design parameters for the plant stand and the solar panel.
 """
-function make_scene(; scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, interrow=0.20, panel_dimensions=(1.0, 4.2), panel_inclination=25.0, panel_height=4.00, type="wheat")
+function make_scene(; plant_density=60.0, interrow=0.20, n_rows=2, panel_dimensions=(n_rows * interrow, 4.2), panel_y_distance=10.0, panel_inclination=25.0, panel_height=4.00, type="wheat")
+
+
+    # Define plant design:
+    intrarow, plants_per_row, n_plants = define_plant_design(panel_y_distance, plant_density, interrow, n_rows)
+
     @assert typeof(type) <: AbstractString "Please specify only one plant type for the scene. Options are: 'wheat' or 'example_plant'."
     @assert type in ["wheat", "example_plant"] "Invalid plant type. Options are: 'wheat' or 'example_plant'."
 
@@ -142,11 +148,8 @@ function make_scene(; scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, inte
     # Set scene dimensions
     scene_mtg.scene_dimensions = (
         Point3(0.0, 0.0, 0.0),
-        Point3(scene_dimensions.x, scene_dimensions.y, 0.0)
+        Point3(interrow * n_rows, panel_y_distance, 0.0)
     )
-
-    # Define plant design:
-    intrarow, plants_per_row, n_rows, n_plants = define_plant_design(scene_dimensions, plant_density, interrow)
 
     # Place the solar panel in the scene:
     place_in_scene!(
@@ -156,6 +159,7 @@ function make_scene(; scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, inte
         plant_id=1,
         functional_group="panel",
         pos=(0.0, 0.0, 0.0),
+        rebind_scene=false,
         # scale=1.15,
         # rotation=-0.35,
         # inclination_angle=0.12,

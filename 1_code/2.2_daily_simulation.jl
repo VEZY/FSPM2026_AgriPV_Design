@@ -13,9 +13,8 @@ using AlgebraOfGraphics, DataFrames, Statistics
 includet("0_make_scene.jl") # Requires Revise to be installed. Else, remove the "t" in includet and re-run the code after editing 0_make_scene.jl to see the changes.
 using .MakeScene
 
-scene = MakeScene.make_scene(scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, interrow=0.20, panel_dimensions=(1.0, 4.2), panel_inclination=25.0, panel_height=4.00)
-
-# f, ax, p = plantviz(scene.mtg, figure=(size=(1080, 720),))
+scene = MakeScene.make_scene(plant_density=60.0, interrow=0.20, n_rows=2, panel_dimensions=(0.2 * 2, 4.2), panel_y_distance=10.0, panel_inclination=25.0, panel_height=4.00, type="wheat")
+f, ax, p = plantviz(scene.mtg, figure=(size=(1080, 720),))
 
 models = MakeScene.models("wheat")
 
@@ -32,6 +31,7 @@ options = LightOptions(
     toricity=true,
     scattering=true,
     cache_radiation=true,
+    all_in_turtle=true,
 )
 
 row = prepare_meteo(meteo_rows, options);
@@ -64,8 +64,7 @@ end
 # and the daily absorbed PAR by the crop:
 
 wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
-tiled = ArchimedLight.tile_light_geometry(scene, series; nx=15, ny=3)
-# tiled = ArchimedLight.tile_light_geometry(scene, series; nx=2, ny=2)
+tiled = ArchimedLight.tile_light_geometry(scene, series; nx=40, ny=3)
 begin
     f = Figure(size=(900, 700))
     ax2 = Axis3(
@@ -80,17 +79,9 @@ begin
     p = ArchimedLight.lightplot!(ax2, tiled, series; color=:Ri_PAR_f, colormap=:thermal, timestep=12)
     # Inset axis for the plant alone:
     ax_inset = Axis3(
-        # f[1, 1],
         f[3, 1],
-        # width=Relative(0.2),
-        # height=Relative(0.2),
-        # halign=1.0,
-        # valign=0.8,
         aspect=:data,
         title="Individual wheat plant",
-        # xticklabelsize=10,
-        # yticklabelsize=10,
-        # zticklabelsize=10,
         xticks=[-0.2, 0.2],
         yticks=[-0.2, 0.2],
         xlabel="x (m)",
@@ -107,11 +98,9 @@ begin
     Colorbar(f[1:2, 3], p, label="Incident PAR (W m⁻²)")
 
     ax3 = Axis(f[3, 2:3], title="aPAR per plant over the day", xlabel="Time of day", ylabel="aPAR (MJ m⁻²)")
-    # lines!(ax3, row.date, apar_crop, label="aPAR absorbed by the crop", color=:green)
-
     plt = data(plant_df) *
           mapping(:date => (x -> Hour(x).value) => "Hour", :apar, group=:plant_id) *
-          visual(Lines, alpha=0.05)
+          visual(Lines, alpha=0.1)
     plant_df_avg = combine(groupby(plant_df, :date), :apar => mean => :apar_mean)
     plt_avg = data(plant_df_avg) *
               mapping(:date => (x -> Hour(x).value) => "Hour", :apar_mean) *
@@ -124,22 +113,3 @@ begin
     f
 end
 save("2_outputs/daily_apar_crop_3d.png", f, update=false, px_per_unit=3.0)
-
-plt = data(plant_df) *
-      mapping(:date => (x -> Hour(x).value) => "Hour", :apar, group=:plant_id) *
-      visual(Lines, alpha=0.05)
-plant_df_avg = combine(groupby(plant_df, :date), :apar => mean => :apar_mean)
-plt_avg = data(plant_df_avg) *
-          mapping(:date => (x -> Hour(x).value) => "Hour", :apar_mean) *
-          visual(Lines, color=:red, linewidth=3)
-
-draw(plt + plt_avg)
-
-Hour(plant_df_avg.date[1]).value
-
-
-f = Figure(size=(900, 700))
-ax = Axis(f[1, 1], title="aPAR absorbed by the crop over the day")
-lines!(ax, row.date, apar_crop, label="aPAR absorbed by the crop (W m⁻²)", color=:green)
-f
-save("2_outputs/apar_crop_over_day.png", f, update=false, px_per_unit=3.0)
