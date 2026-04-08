@@ -90,7 +90,7 @@ begin
         xlabel="x (m)",
         ylabel="y (m)",
         zlabel="z (m)",
-        # azimuth=0.0
+        # azimuth=0.0,
     )
     p = ArchimedLight.lightplot!(ax1, tiled_ref, series_ref; color=:Ri_PAR_f, colormap=:thermal, timestep=12)
 
@@ -103,6 +103,7 @@ begin
         zlabel="z (m)",
         # azimuth=0.0
     )
+    zlims!(ax2, zmin(scene_ref.mtg), zmax(scene_ref.mtg)) # Set the same z limits for both plots to make them comparable
     p = ArchimedLight.lightplot!(ax2, tiled_0, series_0; color=:Ri_PAR_f, colormap=:thermal, timestep=12)
 
     # Plant alone:
@@ -125,21 +126,21 @@ begin
 
     Colorbar(f[1:2, 5], p, label="Incident PAR (W m⁻²)")
 
-    ax4 = Axis(f[3, 2:3], title="aPAR per plant over the day", xlabel="Time of day", ylabel="aPAR (MJ m⁻²)")
+    ax4 = Axis(f[3, 3:5], title="aPAR per plant over the day", xlabel="Time of day", ylabel="aPAR (MJ m⁻²)")
     plt = data(plant_df_ref) *
           mapping(:date => (x -> Hour(x).value) => "Hour", :apar, group=:plant_id) *
           visual(Lines, alpha=0.05)
     plant_df_ref_avg = combine(groupby(plant_df_ref, :date), :apar => mean => :apar_mean)
     plt_avg = data(plant_df_ref_avg) *
               mapping(:date => (x -> Hour(x).value) => "Hour", :apar_mean) *
-              visual(Lines, color=:black, linewidth=3)
+              visual(Lines, color=:red, linewidth=3)
     plt_0 = data(plant_df_0) *
             mapping(:date => (x -> Hour(x).value) => "Hour", :apar, group=:plant_id) *
-            visual(Lines, alpha=0.05, color=:blue)
+            visual(Lines, alpha=0.05, color=:black, linestyle=:dash)
     plant_df_0_avg = combine(groupby(plant_df_0, :date), :apar => mean => :apar_mean)
     plt_avg_0 = data(plant_df_0_avg) *
                 mapping(:date => (x -> Hour(x).value) => "Hour", :apar_mean) *
-                visual(Lines, color=:blue, linewidth=3)
+                visual(Lines, color=:red, linewidth=3, linestyle=:dash)
 
     draw!(ax4, plt + plt_0 + plt_avg + plt_avg_0)
     # draw!(ax4, plt)
