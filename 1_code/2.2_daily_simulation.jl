@@ -7,7 +7,7 @@ using PlantGeom # For the growth and visualization API
 using GLMakie
 using ArchimedLight
 using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
-using AlgebraOfGraphics, DataFrames, Statistics
+using AlgebraOfGraphics, DataFrames, Statistics, CSV
 
 # Add custome module:
 includet("0_make_scene.jl") # Requires Revise to be installed. Else, remove the "t" in includet and re-run the code after editing 0_make_scene.jl to see the changes.
@@ -47,11 +47,6 @@ function make_simulation(; panel_length=4.2, panel_inclination=25.0, models, met
 
     # Attach the results to the MTG for visualization:
     attach_light_series!(scene, series_ref; fields=[:incident_par_flux, :absorbed_par_energy, :absorbed_par_flux])
-
-    plant_absorbed_par_energy = descendants(scene.mtg, :Ra_PAR_q, symbol=:Leaf)
-
-    # Compute the absorbed PAR by the crop over the day, by summing the absorbed PAR energy of all the leaves at each timestep:
-    apar_crop = [sum(leaf[timestep] for leaf in plant_absorbed_par_energy) for timestep in 1:length(meteo)] * 1e-6 # Convert from J to MJ
 
     # Compute the absorbed PAR by each plant over the day, by summing the absorbed PAR energy of all the leaves of each plant at each timestep:
     plant_df = let
@@ -110,7 +105,7 @@ begin
     ax_3 = Axis3(
         f[3, 1:2],
         aspect=:data,
-        title="Individual wheat plant",
+        title="C. Individual wheat plant",
         xticks=[-0.2, 0.2],
         yticks=[-0.2, 0.2],
         xlabel="x (m)",
@@ -126,7 +121,7 @@ begin
 
     Colorbar(f[1:2, 5], p, label="Incident PAR (W m⁻²)")
 
-    ax4 = Axis(f[3, 3:5], title="aPAR per plant over the day", xlabel="Time of day", ylabel="aPAR (MJ m⁻²)")
+    ax4 = Axis(f[3, 3:5], title="D. aPAR per plant over the day", xlabel="Time of day", ylabel="aPAR (MJ m⁻²)")
     plt = data(plant_df_ref) *
           mapping(:date => (x -> Hour(x).value) => "Hour", :apar, group=:plant_id) *
           visual(Lines, alpha=0.05)
@@ -149,3 +144,23 @@ begin
     f
 end
 save("2_outputs/daily_apar_crop_3d.png", f, update=false, px_per_unit=3.0)
+
+
+CSV.write("2_outputs/daily_apar_crop_horizontal_design.csv", plant_df_0)
+CSV.write("2_outputs/daily_apar_crop_tilted_design.csv", plant_df_ref)
+
+plant_df_0 = CSV.read("2_outputs/daily_apar_crop_horizontal_design.csv", DataFrame)
+plant_df_ref = CSV.read("2_outputs/daily_apar_crop_tilted_design.csv", DataFrame)
+
+apar_sum_plant_0 = combine(groupby(plant_df_0, :plant_id), :apar => sum => :apar_sum)
+apar_sum_plant_ref = combine(groupby(plant_df_ref, :plant_id), :apar => sum => :apar_sum)
+minimum(apar_sum_plant_0.apar_sum), maximum(apar_sum_plant_0.apar_sum), mean(apar_sum_plant_0.apar_sum)
+minimum(apar_sum_plant_ref.apar_sum), maximum(apar_sum_plant_ref.apar_sum), mean(apar_sum_plant_ref.apar_sum)
+
+minimum(apar_sum_plant_0.apar_sum) / maximum(apar_sum_plant_0.apar_sum)
+
+
+plant_df_0_avg = combine(groupby(plant_df_0, :date), :apar => mean => :apar_mean)
+plant_df_ref_avg = combine(groupby(plant_df_ref, :date), :apar => mean => :apar_mean)
+
+horizontal_design_compared_to_ref = (sum(plant_df_0_avg.apar_mean) / sum(plant_df_ref_avg.apar_mean) * 100) - 100
