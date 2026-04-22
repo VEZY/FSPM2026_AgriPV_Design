@@ -136,7 +136,7 @@ function make_scene(; plant_density=60.0, interrow=0.20, n_rows=2, panel_dimensi
 
     # Make the plant:
     if type == "wheat"
-        small_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+        small_plant = read_opf("0_simulations/archimed/objects/scene1_plant1_1.opf", mtg_type=NodeMTG)
     elseif type == "example_plant"
         small_plant = make_simple_plant()
     end

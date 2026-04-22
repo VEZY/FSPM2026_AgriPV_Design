@@ -72,7 +72,7 @@ scene_0, series_0, plant_df_0 = make_simulation(panel_length=3.8, panel_inclinat
 # and an inset with the plant geometry colored in green,
 # and the daily absorbed PAR by the crop:
 
-wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+wheat_plant = read_opf("0_simulations/archimed/objects/scene1_plant1_1.opf", mtg_type=NodeMTG)
 tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=40, ny=3)
 tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=40, ny=3)
 
