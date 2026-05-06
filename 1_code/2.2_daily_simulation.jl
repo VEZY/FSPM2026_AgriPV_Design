@@ -2,7 +2,6 @@ using Colors # For color definitions
 using Agrivoltaics # For the solar panel structure and mesh generation
 using GeometryBasics # For geometry
 using MultiScaleTreeGraph # For the MTG data structure
-using OrderedCollections: OrderedDict
 using PlantGeom # For the growth and visualization API
 using GLMakie
 using ArchimedLight
@@ -10,11 +9,62 @@ using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
 using AlgebraOfGraphics, DataFrames, Statistics, CSV
 using PlantBiophysics, PlantSimEngine
 
-# Add custome module:
-includet("0_make_scene.jl") # Requires Revise to be installed. Else, remove the "t" in includet and re-run the code after editing 0_make_scene.jl to see the changes.
-using .MakeScene
+function wheat_models()
+    models_for(
+        "wheat" => (
+            "Stem" => translucent(par=0.15, nir=0.90),
+            "Leaf" => translucent(par=0.15, nir=0.90),
+        ),
+        "panel" => (
+            "Panel" => translucent(par=0.0, nir=0.0),
+        ),
+        "pavement" => (
+            "Cobblestone" => translucent(par=0.12, nir=0.60),
+        ),
+    )
+end
 
-models = MakeScene.models("wheat")
+function wheat_scene(;
+    plant_density=60.0,
+    interrow=0.20,
+    n_rows=2,
+    panel_length=4.2,
+    panel_inclination=25.0,
+    panel_height=4.0,
+    panel_y_distance=10.0,
+)
+    intrarow = 1.0 / (plant_density * interrow)
+    plants_per_row = max(1, floor(Int, panel_y_distance / intrarow) - 1)
+    panel_width = interrow * n_rows
+    wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+    panel = Agrivoltaics.Fixed(
+        panel_dimensions=(panel_width, panel_length),
+        inclination=panel_inclination,
+        panel_height=panel_height,
+    ) |> structure
+
+    return PlantGeom.make_scene(domain=(0.0, 0.0, panel_width, panel_y_distance)) do s
+        add_object!(s, panel; group="panel", type="Panel", id=1)
+
+        for i in 1:(plants_per_row * n_rows)
+            row = (i - 1) ÷ plants_per_row
+            col = (i - 1) % plants_per_row
+            add_plant!(
+                s,
+                wheat_plant;
+                group="wheat",
+                id=i + 1,
+                at=((row + 0.5) * interrow, (col + 0.5) * intrarow, 0.0),
+                rotate=(z=randn() * 5.0,),
+                deg=true,
+            )
+        end
+
+        add_ground!(s; nx=60, ny=60, group="pavement", type="Cobblestone")
+    end
+end
+
+models = wheat_models()
 
 # meteo = CSV.read("0_simulations/meteo/meteo_data_2025_montpellier.csv", DataFrame)
 meteo = read_weather("0_simulations/meteo/meteo_data_2025_montpellier.csv", duration=x -> Hour(1));
@@ -39,13 +89,18 @@ row = prepare_meteo(meteo_rows, options);
 function make_simulation(; panel_length=4.2, panel_inclination=25.0, models, meteo, options)
     n_rows = 2
     interrow = 0.20
-    panel_width = interrow * n_rows
-    scene = MakeScene.make_scene(
-        plant_density=60.0, interrow=interrow, n_rows=n_rows, panel_dimensions=(panel_width, panel_length),
-        panel_y_distance=10.0, panel_inclination=panel_inclination, panel_height=4.00, type="wheat"
+    scene = wheat_scene(
+        plant_density=60.0,
+        interrow=interrow,
+        n_rows=n_rows,
+        panel_length=panel_length,
+        panel_inclination=panel_inclination,
+        panel_height=4.0,
+        panel_y_distance=10.0,
     )
     # f, ax, p = plantviz(scene_ref.mtg, figure=(size=(1080, 720),))
-    series = run_light_series(scene, models, meteo, options)
+    sim = LightSimulation(scene, models; options=options)
+    series = run_light(sim, meteo)
 
     # Attach the results to the MTG for visualization:
     attach_light_series!(

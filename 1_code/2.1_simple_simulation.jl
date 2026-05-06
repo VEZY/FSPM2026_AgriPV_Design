@@ -2,16 +2,73 @@ using Colors # For color definitions
 using Agrivoltaics # For the solar panel structure and mesh generation
 using GeometryBasics # For geometry
 using MultiScaleTreeGraph # For the MTG data structure
-using OrderedCollections: OrderedDict
 using PlantGeom # For the growth and visualization API
 using GLMakie
 using ArchimedLight
 
-# Add custome module:
-includet("0_make_scene.jl") # Requires Revise to be installed. Else, remove the "t" in includet and re-run the code after editing 0_make_scene.jl to see the changes.
-using .MakeScene
+function wheat_models()
+    models_for(
+        "wheat" => (
+            "Stem" => translucent(par=0.15, nir=0.90),
+            "Leaf" => translucent(par=0.15, nir=0.90),
+        ),
+        "panel" => (
+            "Panel" => translucent(par=0.0, nir=0.0),
+        ),
+        "pavement" => (
+            "Cobblestone" => translucent(par=0.12, nir=0.60),
+        ),
+    )
+end
 
-scene = MakeScene.make_scene(scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, interrow=0.20, panel_dimensions=(1.0, 4.2), panel_inclination=25.0, panel_height=4.00)
+function wheat_scene(;
+    plant_density=60.0,
+    interrow=0.20,
+    n_rows=2,
+    panel_length=4.2,
+    panel_inclination=25.0,
+    panel_height=4.0,
+    panel_y_distance=10.0,
+)
+    intrarow = 1.0 / (plant_density * interrow)
+    plants_per_row = max(1, floor(Int, panel_y_distance / intrarow) - 1)
+    panel_width = interrow * n_rows
+    wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+    panel = Agrivoltaics.Fixed(
+        panel_dimensions=(panel_width, panel_length),
+        inclination=panel_inclination,
+        panel_height=panel_height,
+    ) |> structure
+
+    return PlantGeom.make_scene(domain=(0.0, 0.0, panel_width, panel_y_distance)) do s
+        add_object!(s, panel; group="panel", type="Panel", id=1)
+
+        for i in 1:(plants_per_row * n_rows)
+            row = (i - 1) ÷ plants_per_row
+            col = (i - 1) % plants_per_row
+            add_plant!(
+                s,
+                wheat_plant;
+                group="wheat",
+                id=i + 1,
+                at=((row + 0.5) * interrow, (col + 0.5) * intrarow, 0.0),
+                rotate=(z=randn() * 5.0,),
+                deg=true,
+            )
+        end
+
+        add_ground!(s; nx=60, ny=60, group="pavement", type="Cobblestone")
+    end
+end
+
+scene = wheat_scene(
+    plant_density=60.0,
+    interrow=0.20,
+    n_rows=5,
+    panel_length=4.2,
+    panel_inclination=25.0,
+    panel_height=4.0,
+)
 
 traverse!(scene.mtg) do node
     if symbol(node) == :Leaf
@@ -24,7 +81,7 @@ end
 # f, ax, p = plantviz(scene.mtg, figure=(size=(1080, 720),), color=:color)
 # save("2_outputs/simple_plant_scene.png", f, update=false, px_per_unit=3.0)
 
-models = MakeScene.models("wheat")
+models = wheat_models()
 
 sky = SkyState(
     135.0,  # sun azimuth in degrees
@@ -43,15 +100,8 @@ options = LightOptions(
 )
 
 function run_archimed(options, sky, scene, models)
-    turtle = build_turtle(options, sky)
-    fluxes = compute_directional_fluxes(sky, turtle, options)
-    first = compute_first_order(scene, models, turtle, fluxes, options)
-    scat = compute_scattering(scene, models, turtle, first, options)
-    budget = integrate_light(scene, models, first, scat, options; step_duration_seconds=1800.0)
-    render_geometry = ArchimedLight.light_render_geometry(scene, models, options)
-    step = LightStepResult(sky, turtle, fluxes, first, scat, budget, Dict{String,Float64}(), render_geometry)
-
-    return step
+    sim = LightSimulation(scene, models; options=options)
+    return run_light(sim, sky; step_duration_seconds=1800.0)
 end
 
 @time step = run_archimed(options, sky, scene, models) # 30s for the full scene with scattering
