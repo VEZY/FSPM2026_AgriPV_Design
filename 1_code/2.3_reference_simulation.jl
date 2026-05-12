@@ -62,7 +62,7 @@ meteo_rows = TableOperations.filter(x -> Date(2025, 6, 25) == Date(Tables.getcol
 
 options = LightOptions(
     # turtle_sectors=46,
-    turtle_sectors=8,
+    turtle_sectors=16,
     pixel_size=0.01,
     toricity=true,
     scattering=true,
