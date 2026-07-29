@@ -11,7 +11,7 @@ using ArchimedLight
 includet("0_make_scene.jl") # Requires Revise to be installed. Else, remove the "t" in includet and re-run the code after editing 0_make_scene.jl to see the changes.
 using .MakeScene
 
-scene = MakeScene.make_scene(scene_dimensions=(x=1.0, y=10.0), plant_density=60.0, interrow=0.20, panel_dimensions=(1.0, 4.2), panel_inclination=25.0, panel_height=4.00)
+scene = MakeScene.make_scene(plant_density=60.0, interrow=0.20, panel_dimensions=(1.0, 4.2), panel_inclination=25.0, panel_height=4.00)
 
 traverse!(scene.mtg) do node
     if symbol(node) == :Leaf

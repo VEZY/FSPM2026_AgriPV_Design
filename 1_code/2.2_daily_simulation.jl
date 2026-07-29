@@ -32,7 +32,11 @@ options = LightOptions(
     all_in_turtle=true,
 )
 
-row = prepare_meteo(meteo_rows, options);
+meteo_metadat = PlantMeteo.TimeStepTable(
+    meteo_rows,
+    (latitude=0.0, altitude=100.0, file="interactive",),
+)
+row = prepare_meteo(meteo_metadat, options);
 
 function make_simulation(; panel_length=4.2, panel_inclination=25.0, models, meteo, options)
     n_rows = 2
@@ -43,7 +47,7 @@ function make_simulation(; panel_length=4.2, panel_inclination=25.0, models, met
         panel_y_distance=10.0, panel_inclination=panel_inclination, panel_height=4.00, type="wheat"
     )
     # f, ax, p = plantviz(scene_ref.mtg, figure=(size=(1080, 720),))
-    @time series_ref = run_light_series(scene, models, meteo, options)
+    @time series_ref = ArchimedLight.run_light_series(scene, models, meteo, options)
 
     # Attach the results to the MTG for visualization:
     attach_light_series!(scene, series_ref; fields=[:incident_par_flux, :absorbed_par_energy, :absorbed_par_flux])
