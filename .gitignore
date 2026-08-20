@@ -39,3 +39,6 @@ docs/site/
 
 # Except for one that we use in the readme:
 !2_outputs/simple_plant_scene_light_scat.png
+
+# Ignore the Manifest
+Manifest.toml
