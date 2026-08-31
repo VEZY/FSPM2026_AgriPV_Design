@@ -46,7 +46,7 @@ function wheat_scene(;
     return PlantGeom.make_scene(domain=(0.0, 0.0, panel_width, panel_y_distance)) do s
         add_object!(s, panel; group="panel", type="Panel", id=1)
 
-        for i in 1:(plants_per_row * n_rows)
+        for i in 1:(plants_per_row*n_rows)
             row = (i - 1) ÷ plants_per_row
             col = (i - 1) % plants_per_row
             add_plant!(
@@ -68,10 +68,13 @@ models = wheat_models()
 
 # meteo = CSV.read("0_simulations/meteo/meteo_data_2025_montpellier.csv", DataFrame)
 meteo = read_weather("0_simulations/meteo/meteo_data_2025_montpellier.csv", duration=x -> Hour(1));
+metadata = (location="Montpellier", latitude=43.61, longitude=3.878, timezone="Europe/Paris")
+meteo = Weather(meteo, metadata);
+
 # Take only one day near the harvest:
 # filter!(row -> row.timestamp > DateTime(2025, 6, 24) && row.timestamp <= DateTime(2025, 6, 25), meteo)
 # meteo_rows = TableOperations.filter(x -> DateTime(2025, 6, 24) < Tables.getcolumn(x, :date) <= DateTime(2025, 6, 25), meteo) |> Tables.rowtable
-meteo_rows = TableOperations.filter(x -> Date(2025, 6, 25) == Date(Tables.getcolumn(x, :date)), meteo) |> TimeStepTable;
+meteo_rows = TableOperations.filter(x -> Date(2025, 6, 25) == Date(Tables.getcolumn(x, :date)), meteo) |> (x -> TimeStepTable(x, metadata));
 
 options = LightOptions(
     # turtle_sectors=46,
@@ -164,10 +167,10 @@ scene_0, series_0, plant_df_0 = make_simulation(panel_length=3.8, panel_inclinat
 # and an inset with the plant geometry colored in green,
 # and the daily absorbed PAR by the crop:
 wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
-# tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=40, ny=3)
-# tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=40, ny=3)
-tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=1, ny=1)
-tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=1, ny=1)
+tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=40, ny=3)
+tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=40, ny=3)
+# tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=1, ny=1)
+# tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=1, ny=1)
 
 begin
     f = Figure(size=(900, 700))

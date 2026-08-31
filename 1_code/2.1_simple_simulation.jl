@@ -40,10 +40,10 @@ function wheat_scene(;
         panel_height=panel_height,
     ) |> structure
 
-    return PlantGeom.make_scene(domain=(0.0, 0.0, panel_width, panel_y_distance)) do s
+    scene = PlantGeom.make_scene(domain=(0.0, 0.0, panel_width, panel_y_distance)) do s
         add_object!(s, panel; group="panel", type="Panel", id=1)
 
-        for i in 1:(plants_per_row * n_rows)
+        for i in 1:(plants_per_row*n_rows)
             row = (i - 1) ÷ plants_per_row
             col = (i - 1) % plants_per_row
             add_plant!(
@@ -59,16 +59,23 @@ function wheat_scene(;
 
         add_ground!(s; nx=60, ny=60, group="pavement", type="Cobblestone")
     end
+
+    return scene
 end
 
-scene = wheat_scene(
+@time scene = wheat_scene(
     plant_density=60.0,
     interrow=0.20,
     n_rows=5,
     panel_length=4.2,
     panel_inclination=25.0,
     panel_height=4.0,
+    panel_y_distance=10.0,
 )
+
+write_ops("2_outputs/scene/simple_plant_scene.opf", scene.mtg)
+
+plantviz(scene.mtg, figure=(size=(1080, 720),))
 
 traverse!(scene.mtg) do node
     if symbol(node) == :Leaf
@@ -97,14 +104,13 @@ options = LightOptions(
     pixel_size=0.01,
     toricity=true,
     scattering=true,
+    all_in_turtle=true,
+    cache_radiation=false,
 )
 
-function run_archimed(options, sky, scene, models)
-    sim = LightSimulation(scene, models; options=options)
-    return run_light(sim, sky; step_duration_seconds=1800.0)
-end
+sim = LightSimulation(scene, models; options=options)
 
-@time step = run_archimed(options, sky, scene, models) # 30s for the full scene with scattering
+@time step = run_light(sim, sky; step_duration_seconds=1800.0) # 177.779756 seconds for the full scene with scattering
 
 # # Tiled:
 # tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
