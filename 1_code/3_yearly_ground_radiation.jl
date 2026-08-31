@@ -5,7 +5,6 @@ using PlantGeom
 using GeometryBasics
 using MultiScaleTreeGraph
 using GLMakie
-using OrderedCollections: OrderedDict
 
 panel = Agrivoltaics.Fixed(panel_dimensions=(1.0, 4.2), inclination=25.0, panel_height=4.0) |> structure
 panel_mesh = PlantGeom.refmesh_to_mesh(panel) 
@@ -23,69 +22,22 @@ norms = GeometryBasics.face_normals(panel_mesh.position, panel_mesh.faces)
 
 scene_width = 10.0      # m (total scene width including margins)
 scene_height = 10.0      # m (total scene height including margins)
-# Make the scene node:
-scene_mtg = MultiScaleTreeGraph.Node(NodeMTG(:/, :Scene, 1, 1))
-# Set scene dimensions
-scene_mtg.scene_dimensions = (
-    Point3(-scene_width/2, 0.0, 0.0),
-    Point3(scene_width/2, scene_height, 0.0)
-)
+scene = PlantGeom.make_scene(domain=(-scene_width / 2, 0.0, scene_width / 2, scene_height)) do s
+    add_object!(s, panel; group="panel", type="Panel", id=1, at=(0.0, 0.0, 0.0))
+    add_ground!(s; nx=120, ny=120, group="pavement", type="Cobblestone")
+end
 
-# Place the solar panel in the scene:
-place_in_scene!(
-    panel;
-    scene=scene_mtg,
-    scene_id=1,
-    plant_id=1,
-    functional_group="panel",
-    pos=(0.0, 0.0, 0.0),
-    # scale=1.15,
-    # rotation=-0.35,
-    # inclination_angle=0.12,
-)
-
-f, ax, p = plantviz(scene_mtg, figure=(size=(1080, 720),))
+f, ax, p = plantviz(scene.mtg, figure=(size=(1080, 720),))
 save("2_outputs/yearly_rad_scene.png", f, update=false, px_per_unit=3.0)
 
-# Make the Archimed Light scene and add the ground:
-scene = prepare_scene(scene_mtg)
-
-add_ground!(
-    scene;
-    nx=120,
-    ny=120,
-    # xy_bounds=(0.0, 0.0, 1.0, 10.0),
-    group="pavement",
-    type="Cobblestone",
+models = models_for(
+    "pavement" => (
+        "Cobblestone" => translucent(par=0.12, nir=0.60),
+    ),
+    "panel" => (
+        "Panel" => translucent(par=0.0, nir=0.0),
+    ),
 )
-
-
-models = prepare_models([
-    GroupModel(
-        "pavement";
-        types=OrderedDict(
-            "Cobblestone" => TypeModel(
-                interception=InterceptionModel(
-                    model="Translucent",
-                    transparency=0.0,
-                    optical_properties=OpticalProperties(0.12, 0.60),
-                ),
-            ),
-        ),
-    ),
-    GroupModel(
-        "panel";
-        types=OrderedDict(
-            "Panel" => TypeModel(
-                interception=InterceptionModel(
-                    model="Translucent",
-                    transparency=0.0,
-                    optical_properties=OpticalProperties(0.0, 0.0),
-                ),
-            ),
-        ),
-    ),
-])
 
 obs = Observer(43.61246, 3.87918, 10.0) # Montpellier, France, 10m above sea level
 tz = TimeZone("Europe/Paris")
@@ -109,13 +61,8 @@ options = LightOptions(
     scattering=true,
 )
 
-turtle = build_turtle(options, sky)
-fluxes = compute_directional_fluxes(sky, turtle, options)
-first = compute_first_order(scene, models, turtle, fluxes, options)
-scat = compute_scattering(scene, models, turtle, first, options)
-budget = integrate_light(scene, models, first, scat, options; step_duration_seconds=1800.0)
-
-step = LightStepResult(sky, turtle, fluxes, first, scat, budget, Dict{String,Float64}())
+sim = LightSimulation(scene, models; options=options)
+step = run_light(sim, sky; step_duration_seconds=1800.0)
 
 # Attach the results to the MTG for visualization:
 attach_light_step!(scene, step; fields=[:incident_par_flux, :absorbed_par_energy, :absorbed_par_flux])
