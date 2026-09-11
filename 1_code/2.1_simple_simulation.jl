@@ -6,6 +6,8 @@ using PlantGeom # For the growth and visualization API
 using GLMakie
 using ArchimedLight
 
+ground_res = 60;
+
 function wheat_models()
     models_for(
         "wheat" => (
@@ -46,6 +48,7 @@ function wheat_scene(;
         for i in 1:(plants_per_row*n_rows)
             row = (i - 1) ÷ plants_per_row
             col = (i - 1) % plants_per_row
+            println("Plant n°$(i) in row $(row) column $(col)")
             add_plant!(
                 s,
                 wheat_plant;
@@ -57,7 +60,7 @@ function wheat_scene(;
             )
         end
 
-        add_ground!(s; nx=60, ny=60, group="pavement", type="Cobblestone")
+        add_ground!(s; nx=ground_res, ny=ground_res, group="pavement", type="Cobblestone")
     end
 
     return scene
@@ -73,7 +76,7 @@ end
     panel_y_distance=10.0,
 )
 
-write_ops("2_outputs/scene/simple_plant_scene.opf", scene.mtg)
+# write_ops("2_outputs/scene/simple_plant_scene.ops", scene.mtg)
 
 plantviz(scene.mtg, figure=(size=(1080, 720),))
 
@@ -121,7 +124,7 @@ sim = LightSimulation(scene, models; options=options)
 # tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
 
 wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
-tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
+tiled = ArchimedLight.tile_light_geometry(scene, step; nx=1, ny=1)
 begin
     f = Figure(size=(900, 700))
     ax2 = Axis3(
@@ -165,7 +168,8 @@ begin
     )
 
     Colorbar(f[1, 2], p, label="Incident PAR (W m⁻²)")
+    f
     # hidedecorations!(ax_inset)
 end
 
-save("2_outputs/simple_plant_scene_light_scat_repeated_plant.png", f, update=false, px_per_unit=3.0)
+save("2_outputs/simple_plant_scene_light_scat_repeated_plant_nx=ny=$(ground_res).png", f, update=false, px_per_unit=3.0)
