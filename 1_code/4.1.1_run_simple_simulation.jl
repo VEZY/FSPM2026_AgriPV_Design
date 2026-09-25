@@ -107,6 +107,6 @@ options = LightOptions(
 
 sim = LightSimulation(scene, models; options=options)
 
-@time step = run_light(sim, sky; step_duration_seconds=1800.0) # 177.779756 seconds for the full scene with scattering
+@time stps = run_light(sim, sky; step_duration_seconds=1800.0) # 177.779756 seconds for the full scene with scattering
 
-write_component_values("2_outputs/simulations/results.csv", sim, step)
+write_component_values("2_outputs/simulations/results.csv", sim, stps)
