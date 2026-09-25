@@ -1,5 +1,5 @@
  -----------------------------------------------------------------------------------------
- Stics history file Creation date: 2026/03/23-16:30:01
+ Stics history file Creation date: 2026/09/25-17:07:58
  STICS Version: b751c4702_2025-10-15                              
  -----------------------------------------------------------------------------------------
  
@@ -381,6 +381,7 @@
  *********************************************
  calculation of hourly dew temperature : linear interpolation(actual calculation)
  P_humirac           1
+ Warning: Report variables file doesn't exist: [rap.mod]
  obstarac too big : obstarac = soil depth
  
  *********************************************
@@ -395,9 +396,9 @@
  Attention humcapil  > hcc : risk of excess water
  The simulation runs but the day of incorporation of residues is later than the sowing date.
  The simulation runs but the day of soil cultivation operations is later than the sowing date.
- problem with your profile output dates --> they have been recalculated
+ Warning: Profile variables file doesn't exist: [prof.mod]
  Initial values over the soil depth ( 60 cm):     SWC =  70. mm     SMN = 10.0 kg N/ha
  Program end ... 
  -----------------------------------------------------------------------------------------
- Stics history file end End date: 2026/03/23-16:30:01
+ Stics history file end End date: 2026/09/25-17:07:58
  -----------------------------------------------------------------------------------------
