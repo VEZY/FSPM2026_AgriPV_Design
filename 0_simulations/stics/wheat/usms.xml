@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<usms version="10.0">
+  <usm nom="wheat">
+    <datedebut>290</datedebut>
+    <datefin>700</datefin>
+    <finit>ble_ini.xml</finit>
+    <nomsol>solble</nomsol>
+    <fstation>climblej_sta.xml</fstation>
+    <fclim1>climblej.1994</fclim1>
+    <fclim2>climblej.1995</fclim2>
+    <culturean>2</culturean>
+    <nbplantes>1</nbplantes>
+    <codesimul>0</codesimul>
+    <plante dominance="1">
+      <fplt>wheat_plt.xml</fplt>
+      <ftec>Ble_tec.xml</ftec>
+      <flai>ble.lai</flai>
+      <fobs>wheat.obs</fobs>
+    </plante>
+    <plante dominance="2">
+      <fplt>null</fplt>
+      <ftec>null</ftec>
+      <flai>null</flai>
+      <fobs>null</fobs>
+    </plante>
+  </usm>
+</usms>

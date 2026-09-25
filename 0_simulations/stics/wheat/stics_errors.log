@@ -1,10 +1,11 @@
  -----------------------------------------------------------------------------------------
- Stics errors file Creation date: 2026/03/23-16:30:01
+ Stics errors file Creation date: 2026/09/25-17:07:58
  STICS Version: b751c4702_2025-10-15                              
  -----------------------------------------------------------------------------------------
  
  
- problem with your profile output dates --> they have been recalculated
+ Warning: Report variables file doesn't exist: [rap.mod]
+ Warning: Profile variables file doesn't exist: [prof.mod]
  -----------------------------------------------------------------------------------------
- Stics errors file end End date: 2026/03/23-16:30:01
+ Stics errors file end End date: 2026/09/25-17:07:58
  -----------------------------------------------------------------------------------------
