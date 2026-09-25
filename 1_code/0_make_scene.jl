@@ -124,7 +124,7 @@ function make_scene(;
 
     plant =
         if type == "wheat"
-            read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+            read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
         else
             make_simple_plant()
         end

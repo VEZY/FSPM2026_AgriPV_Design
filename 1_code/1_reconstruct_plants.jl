@@ -6,7 +6,7 @@ using CSV, DataFrames
 using CoordinateTransformations, LinearAlgebra, StaticArrays
 
 
-mesh_wheat = load("0_simulations/archicrop/wheat-blender.obj")
+mesh_wheat = load("0_simulations/archicrop/wheat/static/wheat-blender.obj")
 
 splitted_mesh = split_mesh(GeometryBasics.Mesh(mesh_wheat))
 mesh_wheat[:object] #! use this to index by object id!!
@@ -21,7 +21,7 @@ for (i, obj) in enumerate(mesh_wheat[:object])
     meshes[split(obj, "_")[end]] = GeometryBasics.Mesh(scale * c, f)
 end
 
-mtg = read_mtg("0_simulations/archicrop/wheat.mtg")
+mtg = read_mtg("0_simulations/archicrop/wheat/static/wheat.mtg")
 
 # Re-attach the geometry to the MTG using the Ids from the .obj files and the MTG attribute
 traverse!(mtg) do node
@@ -33,7 +33,7 @@ traverse!(mtg) do node
     end
 end
 
-write_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg)
+write_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg)
 
 # Add scene dimensions:
 domain = CSV.read("0_simulations/stics/domain_per_plant.csv", DataFrame)

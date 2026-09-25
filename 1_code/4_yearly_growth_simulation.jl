@@ -122,10 +122,10 @@ row = prepare_meteo(meteo_rows, options);
 
 
 ## COMPUTE RADIATIVE ENVIRONMENT FOR EACH DAY WITH aPAR
-    # --->  Compute radiation on current day scene
-    # |     Compute total aPAR for each plant
-    # |     Define new plant stage based on aPAR received
-    # LOOP
+# --->  Compute radiation on current day scene
+# |     Compute total aPAR for each plant
+# |     Define new plant stage based on aPAR received
+# LOOP
 ## COMPUTE THE GROWTH OF THE PLANT BASED ON THE aPAR RECEIVED
 plant_stages_opf = Dict(
     0 => "0_simulations/archicrop/wheat/plant_stage_0.opf",
@@ -204,7 +204,7 @@ function wheat_scene(;
     plant_intrarow = 1.0 / (plant_density * plant_interrow)
     plants_per_row = max(1, floor(Int, panel_y_distance / plant_intrarow) - 1)
     panel_width = plant_interrow * n_rows
-    wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+    wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
     panel = Agrivoltaics.Fixed(
         panel_dimensions=(panel_width, panel_length),
         inclination=panel_inclination,

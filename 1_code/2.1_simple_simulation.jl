@@ -35,7 +35,7 @@ function wheat_scene(;
     intrarow = 1.0 / (plant_density * interrow)
     plants_per_row = max(1, floor(Int, panel_y_distance / intrarow) - 1)
     panel_width = interrow * n_rows
-    wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+    wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
     panel = Agrivoltaics.Fixed(
         panel_dimensions=(panel_width, panel_length),
         inclination=panel_inclination,
@@ -123,7 +123,7 @@ sim = LightSimulation(scene, models; options=options)
 
 # tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
 
-wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
 tiled = ArchimedLight.tile_light_geometry(scene, step; nx=1, ny=1)
 begin
     f = Figure(size=(900, 700))

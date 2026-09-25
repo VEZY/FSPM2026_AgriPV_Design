@@ -36,7 +36,7 @@ function wheat_scene(;
     intrarow = 1.0 / (plant_density * interrow)
     plants_per_row = max(1, floor(Int, panel_y_distance / intrarow) - 1)
     panel_width = interrow * n_rows
-    wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+    wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
     panel = Agrivoltaics.Fixed(
         panel_dimensions=(panel_width, panel_length),
         inclination=panel_inclination,
@@ -166,7 +166,7 @@ scene_0, series_0, plant_df_0 = make_simulation(panel_length=3.8, panel_inclinat
 # Make the plot with the incident PAR on the tiled geometry of the noon timestep,
 # and an inset with the plant geometry colored in green,
 # and the daily absorbed PAR by the crop:
-wheat_plant = read_opf("0_simulations/archicrop/wheat/plant_1995-06-24.opf", mtg_type=NodeMTG)
+wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
 tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=40, ny=3)
 tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=40, ny=3)
 # tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=1, ny=1)
@@ -219,19 +219,19 @@ begin
 
     ax4 = Axis(f[3, 3:5], title="D. Assimilation per plant over the day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)", xticks=0:2:24)
     plt = data(plant_df_ref) *
-          mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
-          visual(Lines, alpha=0.05)
+        mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
+        visual(Lines, alpha=0.05)
     plant_df_ref_avg = combine(groupby(plant_df_ref, :date), :assimilation => mean => :assimilation_mean)
     plt_avg = data(plant_df_ref_avg) *
-              mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
-              visual(Lines, color=:red, linewidth=3)
+        mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
+        visual(Lines, color=:red, linewidth=3)
     plt_0 = data(plant_df_0) *
-            mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
-            visual(Lines, alpha=0.05, color=:black, linestyle=:dash)
+        mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
+        visual(Lines, alpha=0.05, color=:black, linestyle=:dash)
     plant_df_0_avg = combine(groupby(plant_df_0, :date), :assimilation => mean => :assimilation_mean)
     plt_avg_0 = data(plant_df_0_avg) *
-                mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
-                visual(Lines, color=:red, linewidth=3, linestyle=:dash)
+        mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
+        visual(Lines, color=:red, linewidth=3, linestyle=:dash)
 
     draw!(ax4, plt + plt_0 + plt_avg + plt_avg_0)
     # draw!(ax4, plt)
