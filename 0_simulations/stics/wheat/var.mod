@@ -1,0 +1,11 @@
+lai(n)
+hauteur
+somupvtsem
+laimax
+laisen(n)
+raint
+trg(n)
+ilevs
+iamfs
+ilaxs
+densite
