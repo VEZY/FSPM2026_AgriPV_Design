@@ -5,117 +5,8 @@ using MultiScaleTreeGraph # For the MTG data structure
 using PlantGeom # For the growth and visualization API
 using ArchimedLight
 
-ground_res = 60;
-
-function wheat_models()
-    models_for(
-        "wheat" => (
-            "Stem" => translucent(par=0.15, nir=0.90),
-            "Leaf" => translucent(par=0.15, nir=0.90),
-        ),
-        "panel" => (
-            "Panel" => translucent(par=0.0, nir=0.0),
-        ),
-        "pavement" => (
-            "Cobblestone" => translucent(par=0.12, nir=0.60),
-        ),
-    )
-end
-
-function wheat_scene(;
-    plant_density=60.0,
-    interrow=0.20,
-    n_rows=2,
-    panel_length=4.2,
-    panel_inclination=25.0,
-    panel_height=4.0,
-    panel_y_distance=10.0,
-)
-    intrarow = 1.0 / (plant_density * interrow)
-    plants_per_row = max(1, floor(Int, panel_y_distance / intrarow) - 1)
-    panel_width = interrow * n_rows
-    wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
-    panel = Agrivoltaics.Fixed(
-        panel_dimensions=(panel_width, panel_length),
-        inclination=panel_inclination,
-        panel_height=panel_height,
-    ) |> structure
-
-    scene = PlantGeom.make_scene(domain=(0.0, 0.0, panel_width, panel_y_distance)) do s
-        add_object!(s, panel; group="panel", type="Panel", id=1)
-
-        for i in 1:(plants_per_row*n_rows)
-            row = (i - 1) ÷ plants_per_row
-            col = (i - 1) % plants_per_row
-            println("Plant n°$(i) in row $(row) column $(col)")
-            add_plant!(
-                s,
-                wheat_plant;
-                group="wheat",
-                id=i + 1,
-                at=((row + 0.5) * interrow, (col + 0.5) * intrarow, 0.0),
-                rotate=(z=randn() * 5.0,),
-                deg=true,
-            )
-        end
-
-        add_ground!(s; nx=ground_res, ny=ground_res, group="pavement", type="Cobblestone")
-    end
-
-    return scene
-end
-
-@time scene = wheat_scene(
-    plant_density=60.0,
-    interrow=0.20,
-    n_rows=5,
-    panel_length=4.2,
-    panel_inclination=25.0,
-    panel_height=4.0,
-    panel_y_distance=10.0,
-)
-
-write_ops("2_outputs/scene/simple_plant_scene.ops", scene.mtg)
-
-traverse!(scene.mtg) do node
-    if symbol(node) == :Leaf
-        node[:color] = node[:is_green] == true ? :green : :yellow
-    end
-    symbol(node) == :Stem && (node[:color] = :green)
-    symbol(node) == :Panel && (node[:color] = :black)
-end
-
-models = wheat_models()
-
-sky = SkyState(
-    135.0,  # sun azimuth in degrees
-    60.0,   # sun elevation in degrees
-    350.0,  # PAR irradiance on horizontal ground, W m^-2
-    250.0,  # NIR irradiance on horizontal ground, W m^-2
-    0.60,   # direct fraction
-    0.40,   # diffuse fraction
-)
-
-options = LightOptions(
-    turtle_sectors=16,
-    pixel_size=0.01,
-    toricity=true,
-    scattering=true,
-    all_in_turtle=true,
-    cache_radiation=false,
-)
-
-sim = LightSimulation(scene, models; options=options)
-
-@time step = run_light(sim, sky; step_duration_seconds=1800.0) # 177.779756 seconds for the full scene with scattering
-
-# # Tiled:
-# tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
-# fig, ax, p = ArchimedLight.lightplot(tiled, step; color=:Ri_PAR_f)
-# save("2_outputs/simple_plant_scene_light_scat_repeated.png", fig, update=false, px_per_unit=3.0)
-
-
-# tiled = ArchimedLight.tile_light_geometry(scene, step; nx=15, ny=3)
+# TODO
+# read_component_values()
 
 wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
 tiled = ArchimedLight.tile_light_geometry(scene, step; nx=1, ny=1)
@@ -167,5 +58,3 @@ begin
 end
 
 save("2_outputs/simple_plant_scene_light_scat_repeated_plant_nx=ny=$(ground_res).png", f, update=false, px_per_unit=3.0)
-
-write_component_values()
