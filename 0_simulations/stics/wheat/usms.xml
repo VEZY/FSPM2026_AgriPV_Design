@@ -1,21 +1,21 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <usms version="10.0">
-  <usm nom="wheat">
-    <datedebut>290</datedebut>
-    <datefin>700</datefin>
-    <finit>ble_ini.xml</finit>
-    <nomsol>solble</nomsol>
-    <fstation>climblej_sta.xml</fstation>
-    <fclim1>climblej.1994</fclim1>
-    <fclim2>climblej.1995</fclim2>
-    <culturean>2</culturean>
+  <usm nom="neodur_2025">
+    <datedebut>1</datedebut>
+    <datefin>365</datefin>
+    <finit>bledur_ini.xml</finit>
+    <nomsol>solbldur</nomsol>
+    <fstation>montpellier_sta.xml</fstation>
+    <fclim1>montpellier.2025</fclim1>
+    <fclim2>montpellier.2025</fclim2>
+    <culturean>1</culturean>
     <nbplantes>1</nbplantes>
     <codesimul>0</codesimul>
     <plante dominance="1">
-      <fplt>wheat_plt.xml</fplt>
-      <ftec>Ble_tec.xml</ftec>
-      <flai>ble.lai</flai>
-      <fobs>wheat.obs</fobs>
+      <fplt>DurumWheat_NEODUR_plt.xml</fplt>
+      <ftec>neodur_tec.xml</ftec>
+      <flai>null</flai>
+      <fobs>null</fobs>
     </plante>
     <plante dominance="2">
       <fplt>null</fplt>

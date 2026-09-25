@@ -2,23 +2,32 @@ library(SticsRPacks)
 library(ggplot2)
 
 workspace <- normalizePath("0_simulations/stics/wheat")
-usms <- get_usms_list(file.path(workspace, "usms.xml"))
-output_path <- file.path("2-outputs", "usms_txt_monocrops")
+usm <- "neodur_2025"
 javastics_path <- "/Users/rvezy/Documents/dev/stics/JavaSTICS-10.5.0-STICS-10.5.0" # Change this path to your local JavaSTICS installation
-
-# usms <- SticsRFiles::get_usms_list(file.path(workspace, "usms.xml"))
-sim_options <- stics_wrapper_options(
-  javastics = javastics_path,
-  workspace = workspace,
-  parallel = TRUE
+stics_exe <- file.path(javastics_path, "bin", "stics_modulo_mac")
+stopifnot(
+  file.exists(stics_exe),
+  usm %in% get_usms_list(file.path(workspace, "usms.xml"))
 )
 
-# Run Beer simulations:
-gen_usms_xml2txt(
+# Generate the STICS input files:
+generated <- gen_usms_xml2txt(
+  javastics = javastics_path,
+  workspace = workspace,
+  usm = usm,
+  stics_version = "V10.5.0",
+  parallel = FALSE
+)
+
+sim_options <- stics_wrapper_options(
+  javastics = javastics_path,
+  stics_exe = stics_exe,
   workspace = workspace,
   parallel = FALSE
 )
-sim <- stics_wrapper(sim_options)
+
+# Run Neodur for the full 2025 calendar year
+sim <- stics_wrapper(sim_options, situation = usm)
 
 p <- plot(
   sim$sim_list,
@@ -34,6 +43,7 @@ p <- plot(
   )
 )
 
+dir.create("2_outputs", recursive = TRUE, showWarnings = FALSE)
 ggsave(
   p[[1]],
   filename = file.path(

@@ -17,3 +17,10 @@ mafeuil_kg_ha
 matigestruc_kg_ha
 QNfeuilleres
 QNtige
+lai(n)
+iflos
+idrps
+imats
+irecs
+mafruit
+tetp(n)

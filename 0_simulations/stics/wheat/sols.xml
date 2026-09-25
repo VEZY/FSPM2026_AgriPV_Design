@@ -1,14 +1,14 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <sols version="10.0">
-  <sol nom="solble">
-    <param format="real" max="60.0" min="0.0" nom="argi">23.1</param>
-    <param format="real" max="0.5" min="0.05" nom="norg">0.1400</param>
-    <param format="real" max="60.0" min="10.0" nom="profhum">22.0000</param>
-    <param format="real" max="100.0" min="0.0" nom="calc">0.6000</param>
+  <sol nom="solbldur">
+    <param format="real" max="60.0" min="0.0" nom="argi">25.0</param>
+    <param format="real" max="0.5" min="0.05" nom="norg">0.2000</param>
+    <param format="real" max="60.0" min="10.0" nom="profhum">30.0000</param>
+    <param format="real" max="100.0" min="0.0" nom="calc">6.5000</param>
     <param format="real" max="9.0" min="4.0" nom="pH">7.0000</param>
     <param format="real" max="0.5" min="0.0" nom="concseuil">0.0000</param>
-    <param format="real" max="0.6" min="0.05" nom="albedo">0.1500</param>
-    <param format="real" max="50.0" min="0.0" nom="q0">6.0000</param>
+    <param format="real" max="0.6" min="0.05" nom="albedo">0.2200</param>
+    <param format="real" max="50.0" min="0.0" nom="q0">9.0000</param>
     <param format="real" max="1.0" min="0.0" nom="ruisolnu">0.0000</param>
     <param format="real" max="1000.0" min="10.0" nom="obstarac">200.0000</param>
     <param format="real" max="100.0" min="5.0" nom="pluiebat">50.0000</param>
@@ -69,19 +69,19 @@
       <colonne nom="epd" />
     </tableau_entete>
     <tableau nb_colonnes="8" nom="layer 1">
-      <colonne nom="epc">15.00</colonne>
-      <colonne nom="HCCF">24.50</colonne>
-      <colonne nom="HMINF">13.00</colonne>
-      <colonne nom="DAF">1.20</colonne>
+      <colonne nom="epc">25.00</colonne>
+      <colonne nom="HCCF">20.00</colonne>
+      <colonne nom="HMINF">11.30</colonne>
+      <colonne nom="DAF">1.30</colonne>
       <colonne nom="cailloux">0.00</colonne>
       <colonne nom="typecailloux">1</colonne>
       <colonne nom="infil">50.00</colonne>
       <colonne nom="epd">10</colonne>
     </tableau>
     <tableau nb_colonnes="8" nom="layer 2">
-      <colonne nom="epc">15.00</colonne>
-      <colonne nom="HCCF">24.50</colonne>
-      <colonne nom="HMINF">13.00</colonne>
+      <colonne nom="epc">20.00</colonne>
+      <colonne nom="HCCF">20.00</colonne>
+      <colonne nom="HMINF">11.30</colonne>
       <colonne nom="DAF">1.40</colonne>
       <colonne nom="cailloux">0.00</colonne>
       <colonne nom="typecailloux">1</colonne>
@@ -89,9 +89,9 @@
       <colonne nom="epd">10</colonne>
     </tableau>
     <tableau nb_colonnes="8" nom="layer 3">
-      <colonne nom="epc">30.00</colonne>
-      <colonne nom="HCCF">21.50</colonne>
-      <colonne nom="HMINF">12.00</colonne>
+      <colonne nom="epc">40.00</colonne>
+      <colonne nom="HCCF">22.00</colonne>
+      <colonne nom="HMINF">11.30</colonne>
       <colonne nom="DAF">1.50</colonne>
       <colonne nom="cailloux">0.00</colonne>
       <colonne nom="typecailloux">1</colonne>
@@ -99,20 +99,20 @@
       <colonne nom="epd">10</colonne>
     </tableau>
     <tableau nb_colonnes="8" nom="layer 4">
-      <colonne nom="epc">30.00</colonne>
-      <colonne nom="HCCF">19.50</colonne>
-      <colonne nom="HMINF">12.00</colonne>
-      <colonne nom="DAF">1.73</colonne>
+      <colonne nom="epc">35.00</colonne>
+      <colonne nom="HCCF">22.00</colonne>
+      <colonne nom="HMINF">11.30</colonne>
+      <colonne nom="DAF">1.50</colonne>
       <colonne nom="cailloux">0.00</colonne>
       <colonne nom="typecailloux">1</colonne>
       <colonne nom="infil">50.00</colonne>
       <colonne nom="epd">10</colonne>
     </tableau>
     <tableau nb_colonnes="8" nom="layer 5">
-      <colonne nom="epc">30.00</colonne>
-      <colonne nom="HCCF">19.50</colonne>
-      <colonne nom="HMINF">12.00</colonne>
-      <colonne nom="DAF">1.73</colonne>
+      <colonne nom="epc">0.00</colonne>
+      <colonne nom="HCCF">0.00</colonne>
+      <colonne nom="HMINF">0.00</colonne>
+      <colonne nom="DAF">0.00</colonne>
       <colonne nom="cailloux">0.00</colonne>
       <colonne nom="typecailloux">1</colonne>
       <colonne nom="infil">50.00</colonne>
