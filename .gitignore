@@ -25,6 +25,8 @@ docs/site/
 
 # Ignore stics simulations files (can be reproduced by running the simulations)
 0_simulations/stics/**
+!0_simulations/stics/wheat/
+!0_simulations/stics/wheat/**
 
 # Ignore ArchiCrop outputs
 0_simulations/archicrop/**/*.mtl
@@ -42,3 +44,5 @@ docs/site/
 
 # Ignore the Manifest
 Manifest.toml
+
+JavaSTICS-10.5.0-STICS-10.5.0
