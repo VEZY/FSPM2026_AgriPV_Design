@@ -58,6 +58,16 @@ function get_config(id::Int8)
         end
     end
 
+    # Check the consistency of panel_x_distance with panel_width
+    if doe.panel_x_distance[1] < doe.panel_width[1]
+        throw("panel_x_distance must equal or greater than panel_width, since panel_x_distance should be the sum of panel_width and x-distance between panels.")
+    end
+
+    # Check the consistency of panel_y_distance with panel_length
+    if doe.panel_y_distance[1] < doe.panel_length[1]
+        throw("panel_y_distance must equal or greater than panel_length, since panel_y_distance should be the sum of panel_length and y-distance between panels.")
+    end
+
     return ConfigPV(
         panel_length=doe[1, :panel_length],
         panel_width=doe[1, :panel_width],
