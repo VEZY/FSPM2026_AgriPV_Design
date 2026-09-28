@@ -58,6 +58,8 @@ density, daily_dynamics, _, _, inter_row = get_stics_data(
         stics_output_file=stics_output_file, 
     )
 
+dates = [value["Date"] for value in daily_dynamics.values() if value is not None]
+
 # Extract 1 set of plant parameters from viable ones for given growth dynamics
 params_wheat = define_params_1_plant(
     dynamics_file=stics_output_file, 
@@ -72,7 +74,11 @@ growing_plant = wheat.grow_plant() # returns a list of MTGs
 
 # From https://github.com/openalea/ArchiCrop/blob/ec69d4b3ea3efe6daf11a24ff1573fa90a39eca8/src/openalea/archicrop/simulation.py#L551
 # For each time step
-for i, mtg in enumerate(growing_plant):
+for d in dates[0]:
+    i = dates[0].index(d)
+    mtg = growing_plant[i]
+    print(f"Date: {d}, MTG: {mtg}")
+# for i, mtg in enumerate(growing_plant):
     # Build and illuminate scene
     sc, _ = build_scene(mtg=mtg, position=(0, 0, 0), senescence=True)
     # Viewer.display(scene)
