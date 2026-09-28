@@ -26,11 +26,12 @@ end
 
 function wheat_scene(;
     plant_density=60.0,
-    interrow=0.20,
-    n_rows=2,
-    c = get_config(0, panel_width=0.4)    # The following should be true: panel_width=interrow * n_rows
+    n_rows=5,
+    c = get_config(0)
 )
+    interrow = c.panel_x_distance / n_rows
     intrarow = 1.0 / (plant_density * interrow)
+    print("Calculated from the plant_density and n_rows:\n\tInterrow: $interrow m\n\tIntrarow: $intrarow m\n-> If they are too different, ensure their consitency by playing with ``n_rows`` and ``panel_width``.")
     plants_per_row = max(1, floor(Int, c.panel_y_distance / intrarow) - 1)
     wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
     panel = Agrivoltaics.Fixed(
@@ -64,15 +65,12 @@ function wheat_scene(;
 end
 
 plant_density = 60.0
-interrow = 0.20
 n_rows = 5
 configID::Int8 = 0
-panel_width = interrow * n_rows
-config = get_config(configID, panel_width)    # The following should be true: panel_width=interrow * n_rows
+config = get_config(configID)
 
 @time scene = wheat_scene(
     plant_density=plant_density,
-    interrow=interrow,
     n_rows=n_rows,
     c = config
 )
@@ -111,4 +109,4 @@ sim = LightSimulation(scene, models; options=options)
 
 @time stps = run_light(sim, sky; step_duration_seconds=1800.0) # 177.779756 seconds for the full scene with scattering
 
-write_component_values("2_outputs/simulations/results_config$configID.csv", sim, stps)
+write_component_values("2_outputs/simulations/simple_results_config$configID.csv", sim, stps)
