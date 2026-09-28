@@ -5,6 +5,8 @@ using MultiScaleTreeGraph # For the MTG data structure
 using PlantGeom # For the growth and visualization API
 using ArchimedLight
 
+include("0_configs.jl")
+
 ground_res = 60;
 
 function wheat_models()
@@ -26,22 +28,18 @@ function wheat_scene(;
     plant_density=60.0,
     interrow=0.20,
     n_rows=2,
-    panel_length=4.2,
-    panel_inclination=25.0,
-    panel_height=4.0,
-    panel_y_distance=10.0,
+    c = get_config(0, panel_width=0.4)    # The following should be true: panel_width=interrow * n_rows
 )
     intrarow = 1.0 / (plant_density * interrow)
-    plants_per_row = max(1, floor(Int, panel_y_distance / intrarow) - 1)
-    panel_width = interrow * n_rows
+    plants_per_row = max(1, floor(Int, c.panel_y_distance / intrarow) - 1)
     wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
     panel = Agrivoltaics.Fixed(
-        panel_dimensions=(panel_width, panel_length),
-        inclination=panel_inclination,
-        panel_height=panel_height,
+        panel_dimensions=(c.panel_width, c.panel_length),
+        inclination=c.panel_inclination,
+        panel_height=c.panel_height,
     ) |> structure
 
-    scene = PlantGeom.make_scene(domain=(0.0, 0.0, panel_width, panel_y_distance)) do s
+    scene = PlantGeom.make_scene(domain=(0.0, 0.0, c.panel_x_distance, c.panel_y_distance)) do s
         add_object!(s, panel; group="panel", type="Panel", id=1)
 
         for i in 1:(plants_per_row*n_rows)
@@ -65,14 +63,18 @@ function wheat_scene(;
     return scene
 end
 
+plant_density = 60.0
+interrow = 0.20
+n_rows = 5
+configID::Int8 = 0
+panel_width = interrow * n_rows
+config = get_config(configID, panel_width)    # The following should be true: panel_width=interrow * n_rows
+
 @time scene = wheat_scene(
-    plant_density=60.0,
-    interrow=0.20,
-    n_rows=5,
-    panel_length=4.2,
-    panel_inclination=25.0,
-    panel_height=4.0,
-    panel_y_distance=10.0,
+    plant_density=plant_density,
+    interrow=interrow,
+    n_rows=n_rows,
+    c = config
 )
 
 # write_ops("2_outputs/scene/simple_plant_scene.ops", scene.mtg)
@@ -109,4 +111,4 @@ sim = LightSimulation(scene, models; options=options)
 
 @time stps = run_light(sim, sky; step_duration_seconds=1800.0) # 177.779756 seconds for the full scene with scattering
 
-write_component_values("2_outputs/simulations/results.csv", sim, stps)
+write_component_values("2_outputs/simulations/results_config$configID.csv", sim, stps)

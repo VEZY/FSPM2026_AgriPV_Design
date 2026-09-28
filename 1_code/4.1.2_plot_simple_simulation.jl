@@ -9,7 +9,7 @@ using ArchimedLight
 # read_component_values()
 
 wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
-tiled = ArchimedLight.tile_light_geometry(scene, step; nx=1, ny=1)
+tiled = ArchimedLight.tile_light_geometry(scene, stps; nx=1, ny=1)
 begin
     f = Figure(size=(900, 700))
     ax2 = Axis3(
@@ -21,7 +21,7 @@ begin
         zlabel="z (m)",
         # azimuth=0.0
     )
-    p = ArchimedLight.lightplot!(ax2, tiled, step; color=:Ri_PAR_f, colormap=:thermal)
+    p = ArchimedLight.lightplot!(ax2, tiled, stps; color=:Ri_PAR_f, colormap=:thermal)
 
 
     # Inset axis
