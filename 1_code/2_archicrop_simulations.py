@@ -82,7 +82,7 @@ for d in dates[0]:
     # Build and illuminate scene
     sc, _ = build_scene(mtg=mtg, position=(0, 0, 0), senescence=True)
     # Viewer.display(scene)
-    # Viewer.frameGL.saveImage(f'scene_{i}.png')     
+    # Viewer.frameGL.saveImage(f'scene_{i}.png')
     mtg_fn = path.glob(f"wheat_{i}_{d}.mtg")
     obj_fn = path.glob(f"wheat_{i}_{d}.obj")
     save_mtg(mtg, sc, mtg_fn, obj_fn)
