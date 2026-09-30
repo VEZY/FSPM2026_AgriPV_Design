@@ -9,7 +9,7 @@ using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
 using AlgebraOfGraphics, DataFrames, Statistics, CSV
 using PlantBiophysics, PlantSimEngine
 
-function wheat_models()
+function agripv_models()
     models_for(
         "wheat" => (
             "Stem" => translucent(par=0.15, nir=0.90),
@@ -24,7 +24,7 @@ function wheat_models()
     )
 end
 
-function wheat_scene(;
+function agripv_scene(;
     plant_density=60.0,
     interrow=0.20,
     n_rows=2,
@@ -64,7 +64,7 @@ function wheat_scene(;
     end
 end
 
-models = wheat_models()
+models = agripv_models()
 
 # meteo = CSV.read("0_simulations/meteo/meteo_data_2025_montpellier.csv", DataFrame)
 meteo = read_weather("0_simulations/meteo/meteo_data_2025_montpellier.csv", duration=x -> Hour(1));
@@ -92,7 +92,7 @@ row = prepare_meteo(meteo_rows, options);
 function make_simulation(; panel_length=4.2, panel_inclination=25.0, models, meteo, options)
     n_rows = 2
     interrow = 0.20
-    scene = wheat_scene(
+    scene = agripv_scene(
         plant_density=60.0,
         interrow=interrow,
         n_rows=n_rows,

@@ -4,7 +4,6 @@ from openalea.archicrop.stics_io import get_stics_data
 from openalea.archicrop.simulation import define_params_1_plant
 from openalea.archicrop.display import build_scene
 from openalea.archicrop.export_mtg import save_mtg
-from pathlib import Path
 
 
 # STICS files
@@ -65,7 +64,6 @@ density, daily_dynamics, _, _, inter_row = get_stics_data(
     )
 
 dates = [value["Date"] for value in daily_dynamics.values() if value is not None]
-print(f"{dates}\n\n")
 
 # Extract 1 set of plant parameters from viable ones for given growth dynamics
 params_wheat = define_params_1_plant(
@@ -77,19 +75,7 @@ params_wheat = define_params_1_plant(
 # Generate and grow plant with ArchiCrop, following the given growth dynamics
 wheat = ArchiCrop(daily_dynamics=daily_dynamics, **params_wheat)
 wheat.generate_potential_plant()
-# print("Show stem_diameters (list of stem_diameter per day) for each node (vid):")
-# for vid,ml in wheat.g.property("mature_length").items():
-#     n = wheat.g.node(vid)
-#     print(f"vid: {vid}; n.stem_diameters: {n.stem_diameters}")
-    # print(f"vars(n): {vars(n.stem_diameters)}; vid: {vid}")
-    # n.age = 36
-    # print(f"n.__dict__: {n.__dict__}")
-
-# print(wheat.g.properties()["stem_diameters"].keys())
-# print(wheat.daily_dynamics.keys())
 growing_plant = wheat.grow_plant() # returns a list of MTGs
-
-print(f"{growing_plant}\n\nof length: {len(growing_plant)}")
 
 # From https://github.com/openalea/ArchiCrop/blob/ec69d4b3ea3efe6daf11a24ff1573fa90a39eca8/src/openalea/archicrop/simulation.py#L551
 # For each time step
@@ -97,15 +83,10 @@ for d in dates:
     i = dates.index(d)
     mtg = growing_plant[d]
     print(f"Date: {d}, MTG: {mtg}")
-# for i, mtg in enumerate(growing_plant):
     # Build and illuminate scene
     sc, _ = build_scene(mtg=mtg, position=(0, 0, 0), senescence=True)
     # Viewer.display(scene)
     # Viewer.frameGL.saveImage(f'scene_{i}.png')
-    # mtg_fn = Path("2_outputs/archicrop/").glob(f"wheat_{i}_{d}.mtg")
-    # obj_fn = Path("2_outputs/archicrop/").glob(f"wheat_{i}_{d}.obj")
-    # mtg_fn = f"2_outputs/archicrop/wheat_{i}_{d}.mtg"
-    # obj_fn = f"2_outputs/archicrop/wheat_{i}_{d}.obj"
-    mtg_fn = Path(f"2_outputs/archicrop/wheat_{i}_{d}.mtg")
-    obj_fn = Path(f"2_outputs/archicrop/wheat_{i}_{d}.obj")
+    mtg_fn = f"2_outputs/archicrop/wheat_{i}_{d}.mtg"
+    obj_fn = f"2_outputs/archicrop/wheat_{i}_{d}.obj"
     save_mtg(mtg, sc, mtg_fn, obj_fn)

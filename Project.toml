@@ -11,6 +11,7 @@ FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 GLFW = "f7f18e0c-5ee9-5ccd-a5bf-e8befd85ed98"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MeshIO = "7269a6da-0436-5bbc-96c2-40638cbb6118"
 MultiScaleTreeGraph = "dd4a991b-8a45-4075-bede-262ee62d5583"
@@ -25,3 +26,6 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TableOperations = "ab02a1b2-a7df-11e8-156e-fb1833f50b87"
 TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
+
+[sources]
+Agrivoltaics = {rev = "main", url = "https://github.com/VEZY/Agrivoltaics.jl#codev"}

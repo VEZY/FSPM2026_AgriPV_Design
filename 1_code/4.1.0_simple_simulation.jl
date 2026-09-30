@@ -8,7 +8,7 @@ using ArchimedLight
 
 ground_res = 60;
 
-function wheat_models()
+function agripv_models()
     models_for(
         "wheat" => (
             "Stem" => translucent(par=0.15, nir=0.90),
@@ -23,7 +23,7 @@ function wheat_models()
     )
 end
 
-function wheat_scene(;
+function agripv_scene(;
     plant_density=60.0,
     interrow=0.20,
     n_rows=2,
@@ -66,7 +66,7 @@ function wheat_scene(;
     return scene
 end
 
-@time scene = wheat_scene(
+@time scene = agripv_scene(
     plant_density=60.0,
     interrow=0.20,
     n_rows=5,
@@ -91,7 +91,7 @@ end
 # f, ax, p = plantviz(scene.mtg, figure=(size=(1080, 720),), color=:color)
 # save("2_outputs/simple_plant_scene.png", f, update=false, px_per_unit=3.0)
 
-models = wheat_models()
+models = agripv_models()
 
 sky = SkyState(
     135.0,  # sun azimuth in degrees

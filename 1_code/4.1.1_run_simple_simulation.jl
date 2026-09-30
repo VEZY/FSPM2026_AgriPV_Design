@@ -5,24 +5,43 @@ using MultiScaleTreeGraph # For the MTG data structure
 using PlantGeom # For the growth and visualization API
 using ArchimedLight
 
-include("0_configs.jl")
+include("pvconfig.jl")
 include("methods.jl")
 
-ground_res = 60;
+models = agripv_models()
+
+sky = SkyState(
+    135.0,  # sun azimuth in degrees
+    60.0,   # sun elevation in degrees
+    350.0,  # PAR irradiance on horizontal ground, W m^-2
+    250.0,  # NIR irradiance on horizontal ground, W m^-2
+    0.60,   # direct fraction
+    0.40,   # diffuse fraction
+)
+
+options = LightOptions(
+    turtle_sectors=16,
+    pixel_size=0.01,
+    toricity=true,
+    scattering=true,
+    all_in_turtle=true,
+    cache_radiation=false,
+)
 
 for id in range(0, 89)
     plant_density = 60.0
     n_rows = 5
     configID::Int8 = id
-    config = get_config(configID)
+    config = get_pvconfig(configID)
 
-    @time scene = wheat_scene(
+    # The phenological stage of plants is determined by the `day` parameter of `agripv_scene()`. Default value is Date(2025, 6, 25)
+    @time scene = agripv_scene(
         plant_density=plant_density,
         n_rows=n_rows,
-        c = config
+        c=config
     )
 
-    # write_ops("2_outputs/scene/simple_plant_scene.ops", scene.mtg)
+    # write_ops("2_outputs/scene/agripv_scene_$configID.ops", scene.mtg)
 
     traverse!(scene.mtg) do node
         if symbol(node) == :Leaf
@@ -31,26 +50,6 @@ for id in range(0, 89)
         symbol(node) == :Stem && (node[:color] = :green)
         symbol(node) == :Panel && (node[:color] = :black)
     end
-
-    models = wheat_models()
-
-    sky = SkyState(
-        135.0,  # sun azimuth in degrees
-        60.0,   # sun elevation in degrees
-        350.0,  # PAR irradiance on horizontal ground, W m^-2
-        250.0,  # NIR irradiance on horizontal ground, W m^-2
-        0.60,   # direct fraction
-        0.40,   # diffuse fraction
-    )
-
-    options = LightOptions(
-        turtle_sectors=16,
-        pixel_size=0.01,
-        toricity=true,
-        scattering=true,
-        all_in_turtle=true,
-        cache_radiation=false,
-    )
 
     sim = LightSimulation(scene, models; options=options)
 
