@@ -1,6 +1,4 @@
-
-
-function make_simulation(; pvconfig, models, meteo, options)
+function day_simulation(; pvconfig, models, day, meteo, options)
     n_rows = 2
     scene = agripv_scene(
         plant_density=60.0,

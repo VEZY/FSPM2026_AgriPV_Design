@@ -1,5 +1,6 @@
-using Dates
-using Glob
+using FileIO, GeometryBasics, CoordinateTransformations, MultiScaleTreeGraph, PlantGeom
+using ArchimedLight
+using Dates, Glob, Agrivoltaics
 
 include("pvconfig.jl")
 
@@ -81,10 +82,10 @@ function agripv_scene(;
 )
     interrow = c.panel_x_distance / n_rows
     intrarow = 1.0 / (plant_density * interrow)
-    print("Calculated from the plant_density and n_rows:\n\tInterrow: $interrow m\n\tIntrarow: $intrarow m\n-> If they are too different, ensure their consitency by playing with ``n_rows`` and ``panel_width``.")
+    # println("Calculated from the plant_density and n_rows:\n\tInterrow: $interrow m\n\tIntrarow: $intrarow m\n-> If they are too different, ensure their consitency by playing with ``n_rows`` and ``panel_width``.")
     plants_per_row = max(1, floor(Int, c.panel_y_distance / intrarow) - 1)
-    obj_path = glob("2_outputs/archicrop/*$day.obj")
-    mtg_path = glob("2_outputs/archicrop/*$day.mtg")
+    obj_path = glob("2_outputs/archicrop/*$day.obj")[1]
+    mtg_path = glob("2_outputs/archicrop/*$day.mtg")[1]
     wheat_plant = read_plant(obj_path, mtg_path)
     panel = Agrivoltaics.Fixed(
         panel_dimensions=(c.panel_width, c.panel_length),
@@ -98,7 +99,7 @@ function agripv_scene(;
         for i in 1:(plants_per_row*n_rows)
             row = (i - 1) ÷ plants_per_row
             col = (i - 1) % plants_per_row
-            println("Plant n°$(i) in row $(row) column $(col)")
+            # println("Plant n°$(i) in row $(row) column $(col)")
             add_plant!(
                 s,
                 wheat_plant;

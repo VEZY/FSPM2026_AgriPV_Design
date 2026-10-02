@@ -89,7 +89,7 @@ options = LightOptions(
 
 row = prepare_meteo(meteo_rows, options);
 
-function make_simulation(; panel_length=4.2, panel_inclination=25.0, models, meteo, options)
+function day_simulation(; panel_length=4.2, panel_inclination=25.0, models, meteo, options)
     n_rows = 2
     interrow = 0.20
     scene = agripv_scene(
@@ -159,9 +159,9 @@ function make_simulation(; panel_length=4.2, panel_inclination=25.0, models, met
     return scene, series, plant_df
 end
 
-scene_ref, series_ref, plant_df_ref = make_simulation(panel_length=4.2, panel_inclination=25.0, models=models, meteo=row, options=options)
+scene_ref, series_ref, plant_df_ref = day_simulation(panel_length=4.2, panel_inclination=25.0, models=models, meteo=row, options=options)
 # Same GCR, different structure:
-scene_0, series_0, plant_df_0 = make_simulation(panel_length=3.8, panel_inclination=0.0, models=models, meteo=row, options=options)
+scene_0, series_0, plant_df_0 = day_simulation(panel_length=3.8, panel_inclination=0.0, models=models, meteo=row, options=options)
 
 # Make the plot with the incident PAR on the tiled geometry of the noon timestep,
 # and an inset with the plant geometry colored in green,

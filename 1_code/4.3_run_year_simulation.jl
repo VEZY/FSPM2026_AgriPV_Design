@@ -8,20 +8,15 @@ using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
 using AlgebraOfGraphics, DataFrames, Statistics, CSV
 using PlantBiophysics, PlantSimEngine
 
-include("methods.jl")
+include("scene.jl")
 include("simulation.jl")
+include("meteo.jl")
 
-day = Date(2025, 6, 25)
+days = Date(2025, 3, 4):Day(1):Date(2025, 7, 2) |> collect
+configIDs = range(0, 0)
 
 models = agripv_models()
-
-# meteo = CSV.read("0_simulations/meteo/meteo_data_2025_montpellier.csv", DataFrame)
-meteo = read_weather("0_simulations/meteo/meteo_data_2025_montpellier.csv", duration=x -> Hour(1));
-metadata = (location="Montpellier", latitude=43.61, longitude=3.878, timezone="Europe/Paris")
-meteo = Weather(meteo, metadata);
-
-# Take only the desired day:
-meteo_rows = TableOperations.filter(x -> day == Date(Tables.getcolumn(x, :date)), meteo) |> (x -> TimeStepTable(x, metadata));
+meteo_rows = get_meteo(days)
 
 options = LightOptions(
     # turtle_sectors=46,
@@ -36,10 +31,10 @@ options = LightOptions(
 
 row = prepare_meteo(meteo_rows, options);
 
-for configID in range(0, 89)
-    scene, sim, series, plant_df = make_simulation(pvconfig=get_pvconfig(configID), models=models, meteo=row, options=options)
+for configID in configIDs
+    scene, sim, series, plant_df = day_simulation(pvconfig=get_pvconfig(configID), models=models, meteo=row, options=options)
 
-    write_component_values("2_outputs/simulations/daily/results_config$configID.csv", sim, series)
+    write_component_values("2_outputs/simulations/yearly/results_config$configID.csv", sim, series)
 
     CSV.write("2_outputs/simulations/daily/apar_config_$configID.csv", plant_df)
 end

@@ -6,9 +6,10 @@ using PlantGeom # For the growth and visualization API
 using ArchimedLight
 
 include("pvconfig.jl")
-include("methods.jl")
+include("scene.jl")
 
 models = agripv_models()
+configIDs = range(0, 0)
 
 sky = SkyState(
     135.0,  # sun azimuth in degrees
@@ -28,7 +29,7 @@ options = LightOptions(
     cache_radiation=false,
 )
 
-for id in range(0, 89)
+for configID in configIDs
     plant_density = 60.0
     n_rows = 5
     configID::Int8 = id
@@ -40,8 +41,7 @@ for id in range(0, 89)
         n_rows=n_rows,
         c=config
     )
-
-    # write_ops("2_outputs/scene/agripv_scene_$configID.ops", scene.mtg)
+    options.scene_rotation_deg = config.panel_orientation
 
     traverse!(scene.mtg) do node
         if symbol(node) == :Leaf

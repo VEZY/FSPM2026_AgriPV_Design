@@ -45,6 +45,10 @@ docs/site/
 # Ignore the Manifest
 Manifest.toml
 
+# STICS software
 JavaSTICS-10.5.0-STICS-10.5.0
 JavaSTICS-10.5.0-STICS-10.5.0.zip
 STICS-SOIL-CROP-MODEL-10.5.0.html
+
+# Shell files (for cluster run)
+*.sh
