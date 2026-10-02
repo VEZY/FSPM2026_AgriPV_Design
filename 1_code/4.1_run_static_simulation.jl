@@ -11,9 +11,18 @@ include("scene.jl")
 models = agripv_models()
 configIDs = range(0, 0)
 
+# sky = SkyState(
+#     135.0,  # sun azimuth in degrees
+#     60.0,   # sun elevation in degrees
+#     350.0,  # PAR irradiance on horizontal ground, W m^-2
+#     250.0,  # NIR irradiance on horizontal ground, W m^-2
+#     0.60,   # direct fraction
+#     0.40,   # diffuse fraction
+# )
+
 sky = SkyState(
-    135.0,  # sun azimuth in degrees
-    60.0,   # sun elevation in degrees
+    180.0,  # sun azimuth in degrees
+    70.0,   # sun elevation in degrees
     350.0,  # PAR irradiance on horizontal ground, W m^-2
     250.0,  # NIR irradiance on horizontal ground, W m^-2
     0.60,   # direct fraction
@@ -31,8 +40,8 @@ options = LightOptions(
 
 for configID in configIDs
     plant_density = 60.0
-    n_rows = 5
-    configID::Int8 = id
+    n_rows = 8
+    configID::Int8 = configID
     config = get_pvconfig(configID)
 
     # The phenological stage of plants is determined by the `day` parameter of `agripv_scene()`. Default value is Date(2025, 6, 25)
@@ -41,7 +50,6 @@ for configID in configIDs
         n_rows=n_rows,
         c=config
     )
-    options.scene_rotation_deg = config.panel_orientation
 
     traverse!(scene.mtg) do node
         if symbol(node) == :Leaf
@@ -52,8 +60,12 @@ for configID in configIDs
     end
 
     sim = LightSimulation(scene, models; options=options)
+    update_options!(
+        sim,
+        LightOptions(sim.options; scene_rotation_deg=config.panel_orientation),
+    )
 
     @time stps = run_light(sim, sky; step_duration_seconds=1800.0) # 177.779756 seconds for the full scene with scattering
 
-    @time write_component_values("2_outputs/simulations/simple/results_config$configID.csv", sim, stps)
+    @time write_component_values("2_outputs/simulations/static/results_config$configID.csv", sim, stps)
 end

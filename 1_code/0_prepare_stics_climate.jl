@@ -29,7 +29,7 @@ all(==("1 hour"), hourly.duration) || error("Expected duration = '1 hour' for ev
 sort!(hourly, :date)
 all(==(Hour(1)), diff(hourly.date)) || error("Duplicate timestamps or gaps in the hourly data.")
 
-# Keep the dates exactly as exported (UTC with the defaults in 0_get_meteo.jl).
+# Keep the dates exactly as exported (UTC with the defaults in 0_make_meteo.jl).
 # Open-Meteo rain and radiation describe the PRECEDING hour, so their daily
 # totals cover 23:00 the previous day to 23:00 the current day.
 # See https://open-meteo.com/en/docs/historical-weather-api

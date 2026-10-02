@@ -62,7 +62,7 @@ function agripv_models()
     models_for(
         "wheat" => (
             "Stem" => translucent(par=0.15, nir=0.90),
-            "Leaf" => translucent(par=0.15, nir=0.90),
+            "LeafSection" => translucent(par=0.15, nir=0.90),
         ),
         "panel" => (
             "Panel" => translucent(par=0.0, nir=0.0),
@@ -75,14 +75,14 @@ end
 
 function agripv_scene(;
     plant_density=60.0,
-    n_rows=5,
+    n_rows=8,
     c=get_pvconfig(0),
     day=Date(2025, 6, 25),
     ground_res=60
 )
     interrow = c.panel_x_distance / n_rows
     intrarow = 1.0 / (plant_density * interrow)
-    # println("Calculated from the plant_density and n_rows:\n\tInterrow: $interrow m\n\tIntrarow: $intrarow m\n-> If they are too different, ensure their consitency by playing with ``n_rows`` and ``panel_width``.")
+    println("Calculated from the plant_density and n_rows:\n\tInterrow: $interrow m\n\tIntrarow: $intrarow m\n-> If they are too different, ensure their consitency by playing with ``n_rows`` and ``panel_width``.")
     plants_per_row = max(1, floor(Int, c.panel_y_distance / intrarow) - 1)
     obj_path = glob("2_outputs/archicrop/*$day.obj")[1]
     mtg_path = glob("2_outputs/archicrop/*$day.mtg")[1]
@@ -99,7 +99,7 @@ function agripv_scene(;
         for i in 1:(plants_per_row*n_rows)
             row = (i - 1) ÷ plants_per_row
             col = (i - 1) % plants_per_row
-            # println("Plant n°$(i) in row $(row) column $(col)")
+            println("Plant n°$(i) in row $(row) column $(col)")
             add_plant!(
                 s,
                 wheat_plant;
