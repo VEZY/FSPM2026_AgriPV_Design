@@ -1,0 +1,5 @@
+configID,panel_length,panel_width,panel_inclination,panel_orientation,panel_height,panel_x_distance,panel_y_distance,panel_tracking
+0,2.1,1.0,0.0,180.0,5.0,panel_width,5.25,false
+1,2.1,1.0,0.0,90.0,5.0,panel_width,5.25,false
+2,1.0,2.1,0.0,180.0,5.0,panel_width,2.5,false
+3,1.0,2.1,0.0,90.0,5.0,panel_width,2.5,false

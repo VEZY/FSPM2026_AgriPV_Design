@@ -1,5 +1,5 @@
 function day_simulation(; pvconfig, models, day, meteo, options)
-    n_rows = 2
+    n_rows = 8
     scene = agripv_scene(
         plant_density=60.0,
         n_rows=n_rows,
@@ -8,6 +8,11 @@ function day_simulation(; pvconfig, models, day, meteo, options)
     )
     # f, ax, p = plantviz(scene_ref.mtg, figure=(size=(1080, 720),))
     sim = LightSimulation(scene, models; options=options)
+    update_options!(
+        sim,
+        LightOptions(sim.options; scene_rotation_deg=config.panel_orientation),
+    )
+    
     series = run_light(sim, meteo)
 
     # Attach the results to the MTG for visualization:

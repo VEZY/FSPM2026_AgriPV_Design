@@ -77,7 +77,7 @@ function agripv_scene(;
     plant_density=60.0,
     n_rows=8,
     c=get_pvconfig(0),
-    day=Date(2025, 6, 25),
+    day=Date(2025, 7, 2),
     ground_res=60
 )
     interrow = c.panel_x_distance / n_rows
