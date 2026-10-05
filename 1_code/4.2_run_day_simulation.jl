@@ -8,36 +8,21 @@ using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
 using AlgebraOfGraphics, DataFrames, Statistics, CSV
 using PlantBiophysics, PlantSimEngine
 
-include("scene.jl")
 include("simulation.jl")
-include("meteo.jl")
+include("pvconfig.jl")
 
-day = Date(2025, 6, 25)
-configIDs = range(0, 0)
-
-models = agripv_models()
-
-# Take only the desired day:
-meteo_rows = get_meteo(day)
-
-options = LightOptions(
-    # turtle_sectors=46,
-    turtle_sectors=16,
-    pixel_size=0.01,
-    toricity=true,
-    scattering=true,
-    cache_radiation=true,
-    all_in_turtle=true,
-    include_sky_fraction=true,
-)
+day = Date(2025, 7, 2)
+configIDs = [Int8(x) for x in range(0, 0)]
 
 for configID in configIDs
-    options.scene_rotation_deg = get_pvconfig(configID).panel_orientation
-    row = prepare_meteo(meteo_rows, options);
+    # options.scene_rotation_deg = get_pvconfig(configID).panel_orientation
+    # row = prepare_meteo(meteo_rows, options);
 
-    scene, sim, series, plant_df = day_simulation(pvconfig=get_pvconfig(configID), models=models, day=day, meteo=row, options=options)
+    println("Config $(configID)...")
+    sim, series, plant_df = day_simulation(pvconfig=get_pvconfig(configID), day=day)
+    println("\tDONE")
 
-    write_component_values("2_outputs/simulations/daily/results_config$configID_$day.csv", sim, series)
+    write_component_values("2_outputs/simulations/daily/results_config$(configID)_$(day).csv", sim, series)
 
-    CSV.write("2_outputs/simulations/daily/apar_config_$configID.csv", plant_df)
+    CSV.write("2_outputs/simulations/daily/apar_config_$(configID)_$(day).csv", plant_df)
 end

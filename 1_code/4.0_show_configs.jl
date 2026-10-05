@@ -1,39 +1,49 @@
 using GLMakie
 using PlantGeom
+using Colors
 
 include("scene.jl")
+include("pvconfig.jl")
 
-configIDs = [Int8(x) for x in range(0, 0)]
+configID::Int8 = 0
 
-for configID in configIDs
-    begin
-        f = Figure(size=(900, 700))
-        config = get_pvconfig(configID)
+f = Figure(size=(900, 700))
+config = get_pvconfig(configID)
 
-        @time scene = agripv_scene(c=config)
+@time scene = agripv_scene(c=config)
 
-        ax_inset = Axis3(
-            f[1, 1],
-            width=Relative(0.2),
-            height=Relative(0.2),
-            halign=1.0,
-            valign=0.8,
-            aspect=:data,
-            title="Config $configID",
-            # xticklabelsvisible=false,
-            # yticklabelsvisible=false,
-            # zticklabelsvisible=false,
-            xticklabelsize=10,
-            yticklabelsize=10,
-            zticklabelsize=10,
-            xticks=[-0.2, 0.2],
-            yticks=[-0.2, 0.2],
-            xlabel="",
-            ylabel="",
-            zlabel="",
-        )
+ax = Axis3(
+    f[1, 1],
+    aspect=:data,
+    title="Config $configID",
+    xlabel="x (m)",
+    ylabel="y (m)",
+    zlabel="z (m)",
+)
 
-        plantviz!(ax_inset, scene.mtg; color=Dict("Cobblestone" => :gray87, "LeafSection" => "#42A25ABD", "Panel" => :black))
-        f
-    end
-end
+plantviz!(ax, scene.mtg; color=Dict("Plant" => :green, "Panel" => :black))
+ax.azimuth[]=deg2rad(45)
+ax.elevation[]=deg2rad(30)
+f
+
+# begin
+#     cam = camera_controls(ax.scene)
+#     # Définir le point visé (souvent le centre de l'objet)
+#     center = (config.panel_x_distance/2.0, config.panel_y_distance/2.0, 0.0)
+#     cam.lookat[] = center
+
+#     # Vue de 3/4 : caméra positionnée en diagonale (45° en azimuth)
+#     # avec une élévation d'environ 30°
+#     r = 10.0                       # distance au centre
+#     azimuth = deg2rad(45)           # angle horizontal
+#     elevation = deg2rad(30)        # angle vertical
+
+#     cam.eyeposition[] = center .+ r .* (
+#         cos(elevation) * cos(azimuth),
+#         cos(elevation) * sin(azimuth),
+#         sin(elevation)
+#     )
+#     cam.upvector[] = Vec3f(0, 0, 1) # z vers le haut
+
+#     update_cam!(ax.scene)          # appliquer la vue
+# end

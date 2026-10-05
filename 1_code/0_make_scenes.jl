@@ -14,7 +14,6 @@ for configID in configIDs
 
         @time scene = agripv_scene(
             plant_density=60,
-            n_rows=8,
             c=config,
             day=day
         )

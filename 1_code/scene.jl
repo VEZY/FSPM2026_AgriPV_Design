@@ -2,8 +2,6 @@ using FileIO, GeometryBasics, CoordinateTransformations, MultiScaleTreeGraph, Pl
 using ArchimedLight
 using Dates, Glob, Agrivoltaics
 
-include("pvconfig.jl")
-
 function read_plant(obj_path::AbstractString, mtg_path::AbstractString)
     # obj_path = normpath("./mtg_obj/usm_1_2.5D_2018-10-09_1.obj")
     # mtg_path = joinpath(dirname(obj_path), first(split(basename(obj_path), ".")) * ".mtg")
@@ -75,14 +73,24 @@ end
 
 function agripv_scene(;
     plant_density=60.0,
-    n_rows=8,
     c=get_pvconfig(0),
     day=Date(2025, 7, 2),
     ground_res=60
 )
+    # The size of the scene (panel_x_distance, panel_y_distance) should
+    # be a multiple of the interrow in x, and of the intrarow in y.
+    # nb_of_plants = (c.panel_x_distance * c.panel_y_distance) * plant_density
+    # x_ratio = c.panel_x_distance / c.panel_y_distance
+    # n_rows = 
+    n_rows = round(Int, c.panel_x_distance * sqrt(plant_density))
     interrow = c.panel_x_distance / n_rows
     intrarow = 1.0 / (plant_density * interrow)
-    println("Calculated from the plant_density and n_rows:\n\tInterrow: $interrow m\n\tIntrarow: $intrarow m\n-> If they are too different, ensure their consitency by playing with ``n_rows`` and ``panel_width``.")
+
+    # BELOW is useful in case of user-defined interrow/intrarow
+    if abs(interrow-intrarow) > 0.05
+        throw("Abort for interrow-intrarow mismatch.\n\t-> Interrow of $interrow m and intrarow of $intrarow m are too different to be realistic.")
+    end
+
     plants_per_row = max(1, floor(Int, c.panel_y_distance / intrarow) - 1)
     obj_path = glob("2_outputs/archicrop/*$day.obj")[1]
     mtg_path = glob("2_outputs/archicrop/*$day.mtg")[1]
@@ -99,7 +107,7 @@ function agripv_scene(;
         for i in 1:(plants_per_row*n_rows)
             row = (i - 1) ÷ plants_per_row
             col = (i - 1) % plants_per_row
-            println("Plant n°$(i) in row $(row) column $(col)")
+            # println("Plant n°$(i) in row $(row) column $(col)")
             add_plant!(
                 s,
                 wheat_plant;
