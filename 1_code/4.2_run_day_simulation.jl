@@ -15,14 +15,15 @@ day = Date(2025, 7, 2)
 configIDs = range(0, 0)
 
 for configID in configIDs
+    # configID = 0
     # options.scene_rotation_deg = get_pvconfig(configID).panel_orientation
     # row = prepare_meteo(meteo_rows, options);
 
     println("Config $(configID)...")
-    sim, series, plant_df = day_simulation(pvconfig=get_pvconfig(configID), day=day)
+    out = day_simulation(pvconfig=get_pvconfig(configID), day=day)
     println("\tDONE")
 
-    write_component_values("2_outputs/simulations/daily/results_config$(configID)_$(day).csv", sim, series)
+    # write_component_values("2_outputs/simulations/daily/results_config$(configID)_$(day).csv", sim, series)
 
-    CSV.write("2_outputs/simulations/daily/apar_config_$(configID)_$(day).csv", plant_df)
+    CSV.write("2_outputs/simulations/daily/out_config_$(configID)_$(day).csv", out)
 end

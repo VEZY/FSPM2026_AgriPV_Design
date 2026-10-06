@@ -21,15 +21,53 @@ function day_simulation(; pvconfig, day)
 
     # Take only the desired day:
     meteo_rows = get_meteo(day)
-    meteo = prepare_meteo(meteo_rows, options)
+    meteo = archimed_meteo(meteo_rows, options)
 
-    sim = LightSimulation(scene, models; options=options)
+    sim = LightSimulation(scene, models; options)
     # update_options!(
     #     sim,
     #     LightOptions(sim.options; scene_rotation_deg=config.panel_orientation),
     # )
 
-    @time series = run_light(sim, meteo)
+    light_application = ModelSpec(
+        ArchimedLightModel(sim; output_schema=:full,
+            par_energy_to_photon=PlantMeteo.Constants().J_to_umol);
+        name=:archimed_light, on=One(scale=:Scene),
+        outputs_to=(
+            OutputTo(Many(scale=:LeafSection, within=SceneScope()); coverage=:exact),
+        ),
+    )
+    photosynthesis = ModelSpec(
+        Fvcb(VcMaxRef=120.0, JMaxRef=240.0, RdRef=1.2, TPURef=20.0);
+        name=:photosynthesis, on=Many(scale=:LeafSection),
+        inputs=(
+            :aPPFD => One(within=Self(), application=:archimed_light,
+                var=:aPPFD, policy=HoldLast()),
+        ),
+    )
+    energy_balance = ModelSpec(
+        Monteith(aₛᵥ=2); name=:energy_balance, on=Many(scale=:LeafSection),
+        inputs=(
+            :Ra_SW_f => One(within=Self(), application=:archimed_light,
+                var=:Ra_SW_f, policy=HoldLast()),
+            :sky_fraction => One(within=Self(), application=:archimed_light,
+                var=:sky_fraction, policy=HoldLast()),
+        ),
+    )
+    stomatal_conductance = ModelSpec(
+        Medlyn(0.0, 5.8); name=:stomatal_conductance, on=Many(scale=:LeafSection),
+    )
+    initial_status(node) = MultiScaleTreeGraph.symbol(node) == :LeafSection ? Status(d=0.01) : Status() # Characteristic leaf dimension (m); replace with measurements.
+
+    # Parameter sources: Camino et al. (2019), Table 2, Townsend et al. (2018), Table III, and Medlyn et al. (2002), respiration assumption.
+    # wheat USO study (2025), section 2.2, CLM5 documentation, Table 9.1.
+    coupled = CompositeModel(
+        scene.mtg; status=initial_status,
+        applications=(light_application, energy_balance, photosynthesis, stomatal_conductance),
+        environment=meteo
+    )
+    simulation = PlantSimEngine.run!(coupled; steps=length(meteo), outputs=:all)
+    outputs = collect_outputs(simulation; sink=DataFrame)
 
     # Attach the results to the MTG for visualization:
     # attach_light_series!(
@@ -82,7 +120,7 @@ function day_simulation(; pvconfig, day)
     #     DataFrame(plant_id=vcat(plan_index...), date=repeat(meteo.date, outer=length(plan_index)), apar=vcat(apar_plant...), assimilation=vcat(assimilation_quantity_plant...))
     # end
 
-    return sim, series#, plant_df
+    return outputs#, plant_df
 end
 
 mapping = (
