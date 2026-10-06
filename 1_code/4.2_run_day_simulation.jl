@@ -19,10 +19,8 @@ for configID in configIDs
     # row = prepare_meteo(meteo_rows, options);
 
     println("Config $(configID)...")
-    sim, series, plant_df = day_simulation(pvconfig=get_pvconfig(configID), day=day)
+    sim, series = day_simulation(pvconfig=get_pvconfig(configID), day=day)
     println("\tDONE")
 
     write_component_values("2_outputs/simulations/daily/results_config$(configID)_$(day).csv", sim, series)
-
-    CSV.write("2_outputs/simulations/daily/apar_config_$(configID)_$(day).csv", plant_df)
 end
