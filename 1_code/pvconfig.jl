@@ -24,7 +24,7 @@ function ConfigPV(;
     return ConfigPV(panel_length, panel_width, panel_inclination, panel_orientation, panel_height, panel_x_distance, panel_y_distance, panel_tracking)
 end
 
-function get_pvconfig(id::Int8)
+function get_pvconfig(id)
     doe = CSV.read("0_simulations/1_doe_flat_panels.csv", DataFrame)
     filter!(x -> x.configID == id, doe)
 
@@ -33,7 +33,7 @@ function get_pvconfig(id::Int8)
     end
 
     # Process the panel_x_distance column if explicit non numerical parameters are given (e.g. panel_x_distance=panel_width)
-    if isa(doe.panel_x_distance[1], String15)
+    if isa(doe.panel_x_distance[1], AbstractString)
         try
             if doe.panel_x_distance[1] == "panel_width"
                 doe.panel_x_distance .= doe.panel_width[1]     # Get the Float value of panel_width
@@ -46,7 +46,7 @@ function get_pvconfig(id::Int8)
     end
 
     # Process the panel_y_distance column if explicit non numerical parameters are given (e.g. panel_y_distance=panel_length)
-    if isa(doe.panel_y_distance[1], String15)
+    if isa(doe.panel_y_distance[1], AbstractString)
         try
             if doe.panel_y_distance[1] == "panel_length"
                 doe.panel_y_distance .= doe.panel_length[1]     # Get the Float value of panel_length
