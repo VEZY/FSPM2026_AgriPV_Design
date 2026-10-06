@@ -21,14 +21,14 @@ function day_simulation(; pvconfig, day)
 
     # Take only the desired day:
     meteo_rows = get_meteo(day)
-    meteo = prepare_meteo(meteo_rows, options);
+    meteo = prepare_meteo(meteo_rows, options)
 
     sim = LightSimulation(scene, models; options=options)
     # update_options!(
     #     sim,
     #     LightOptions(sim.options; scene_rotation_deg=config.panel_orientation),
     # )
-    
+
     @time series = run_light(sim, meteo)
 
     # Attach the results to the MTG for visualization:
@@ -86,26 +86,26 @@ function day_simulation(; pvconfig, day)
 end
 
 mapping = (
-    Ri_PAR_0_f = (:incident_flux,  :initial, :par),
-    Ri_NIR_0_f = (:incident_flux,  :initial, :nir),
-    Ri_PAR_f   = (:incident_flux,  :total,   :par),
-    Ri_NIR_f   = (:incident_flux,  :total,   :nir),
-    Ri_PAR_0_q = (:incident_energy, :initial, :par),
-    Ri_NIR_0_q = (:incident_energy, :initial, :nir),
-    Ri_PAR_q   = (:incident_energy, :total,   :par),
-    Ri_NIR_q   = (:incident_energy, :total,   :nir),
-    Ra_PAR_0_f = (:absorbed_flux,  :initial, :par),
-    Ra_NIR_0_f = (:absorbed_flux,  :initial, :nir),
-    Ra_PAR_f   = (:absorbed_flux,  :total,   :par),
-    Ra_NIR_f   = (:absorbed_flux,  :total,   :nir),
-    Ra_PAR_0_q = (:absorbed_energy, :initial, :par),
-    Ra_NIR_0_q = (:absorbed_energy, :initial, :nir),
-    Ra_PAR_q   = (:absorbed_energy, :total,   :par),
-    Ra_NIR_q   = (:absorbed_energy, :total,   :nir),
+    Ri_PAR_0_f=(:incident_flux, :initial, :par),
+    Ri_NIR_0_f=(:incident_flux, :initial, :nir),
+    Ri_PAR_f=(:incident_flux, :total, :par),
+    Ri_NIR_f=(:incident_flux, :total, :nir),
+    Ri_PAR_0_q=(:incident_energy, :initial, :par),
+    Ri_NIR_0_q=(:incident_energy, :initial, :nir),
+    Ri_PAR_q=(:incident_energy, :total, :par),
+    Ri_NIR_q=(:incident_energy, :total, :nir),
+    Ra_PAR_0_f=(:absorbed_flux, :initial, :par),
+    Ra_NIR_0_f=(:absorbed_flux, :initial, :nir),
+    Ra_PAR_f=(:absorbed_flux, :total, :par),
+    Ra_NIR_f=(:absorbed_flux, :total, :nir),
+    Ra_PAR_0_q=(:absorbed_energy, :initial, :par),
+    Ra_NIR_0_q=(:absorbed_energy, :initial, :nir),
+    Ra_PAR_q=(:absorbed_energy, :total, :par),
+    Ra_NIR_q=(:absorbed_energy, :total, :nir),
 )
 
 function read_component_values(; csv_path)
-    component_values = CSV.read(csv_path, DataFrame; delim=';')
+    component_values = CSV.read(csv_path, DataFrame; delim=(';'))
     sdf = filter(:step_number => ==(1), component_values)
     values_dict = Dict(Int(i) => Float64(v) for (i, v) in zip(sdf.node_id, sdf.Ri_PAR_f))
 
