@@ -9,17 +9,23 @@ using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
 using AlgebraOfGraphics, DataFrames, Statistics, CSV
 using PlantBiophysics, PlantSimEngine
 
-configIDs = [Int8(x) for x in range(0,3)]
+include("simulation.jl")
+
+configIDs = range(0,3)
 
 # TODO
-# read_component_values()
+# values_dict = read_component_values()
+
+plant_df = AbstractArray{DataFrame, lenght(configIDs)}
+plant_df_avg = AbstractArray{DataFrame, lenght(configIDs)}
+apar_sum_plant = AbstractArray{DataFrame, lenght(configIDs)}
 
 for configID in configIDs
-    plant_df = CSV.read("2_outputs/simulations/daily/apar_config_$configID.csv", DataFrame)
-    apar_sum_plant = combine(groupby(plant_df, :plant_id), :apar => sum => :apar_sum)
-    minimum(apar_sum_plant.apar_sum), maximum(apar_sum_plant.apar_sum), mean(apar_sum_plant.apar_sum)
-    minimum(apar_sum_plant.apar_sum) / maximum(apar_sum_plant.apar_sum)
-    plant_df_avg = combine(groupby(plant_df, :date), :apar => mean => :apar_mean)
+    plant_df[configID] = CSV.read("2_outputs/simulations/daily/apar_config_$(configID)_$(day).csv", DataFrame)
+    apar_sum_plant[configID] = combine(groupby(plant_df[configID], :plant_id), :apar => sum => :apar_sum)
+    minimum(apar_sum_plant[configID].apar_sum), maximum(apar_sum_plant[configID].apar_sum), mean(apar_sum_plant[configID].apar_sum)
+    minimum(apar_sum_plant[configID].apar_sum) / maximum(apar_sum_plant[configID].apar_sum)
+    plant_df_avg[configID] = combine(groupby(plant_df[configID], :date), :apar => mean => :apar_mean)
 end
 
 # Make the plot of aPAR average with all configurations

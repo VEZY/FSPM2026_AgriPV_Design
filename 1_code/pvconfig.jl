@@ -24,8 +24,8 @@ function ConfigPV(;
     return ConfigPV(panel_length, panel_width, panel_inclination, panel_orientation, panel_height, panel_x_distance, panel_y_distance, panel_tracking)
 end
 
-function get_pvconfig(id::Int8)
-    doe = CSV.read("0_simulations/1_doe_flat_panels.csv", DataFrame)
+function get_pvconfig(id::Int)
+    doe = CSV.read("0_simulations/1.0_doe_flat_panels.csv", DataFrame)
     filter!(x -> x.configID == id, doe)
 
     if isempty(doe)

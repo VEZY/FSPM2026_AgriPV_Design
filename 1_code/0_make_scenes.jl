@@ -3,7 +3,7 @@ using PlantGeom
 
 include("scene.jl")
 
-configIDs = [Int8(x) for x in range(0, 0)]
+configIDs = range(0, 0)
 days = Date(2025, 3, 4):Day(1):Date(2025, 7, 2) |> collect
 
 for configID in configIDs
