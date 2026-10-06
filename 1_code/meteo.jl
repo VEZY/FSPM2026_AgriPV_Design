@@ -8,6 +8,8 @@ function get_meteo(day::Date)
 
     # Restrict to the growing period:
     meteo_rows = TableOperations.filter(x -> Date(Tables.getcolumn(x, :date)) == day, meteo) |> (x -> TimeStepTable(x, metadata));
+
+    return meteo_rows
 end
 
 function get_meteo(days::Vector{Date})
@@ -17,4 +19,6 @@ function get_meteo(days::Vector{Date})
 
     # Restrict to the growing period:
     meteo_rows = TableOperations.filter(x -> Date(Tables.getcolumn(x, :date)) in days, meteo) |> (x -> TimeStepTable(x, metadata));
+
+    return meteo_rows
 end

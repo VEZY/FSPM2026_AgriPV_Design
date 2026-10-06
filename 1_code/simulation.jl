@@ -8,10 +8,6 @@ function day_simulation(; pvconfig, day)
         day=day
     )
 
-    # Take only the desired day:
-    meteo_rows = get_meteo(day)
-    meteo = prepare_meteo(meteo_rows, options);
-
     options = LightOptions(
         turtle_sectors=46,
         pixel_size=0.01,
@@ -20,8 +16,12 @@ function day_simulation(; pvconfig, day)
         cache_radiation=true,
         all_in_turtle=true,
         include_sky_fraction=true,
-        scene_rotation_deg=c.panel_orientation
+        scene_rotation_deg=pvconfig.panel_orientation
     )
+
+    # Take only the desired day:
+    meteo_rows = get_meteo(day)
+    meteo = prepare_meteo(meteo_rows, options);
 
     sim = LightSimulation(scene, models; options=options)
     # update_options!(
@@ -32,11 +32,11 @@ function day_simulation(; pvconfig, day)
     @time series = run_light(sim, meteo)
 
     # Attach the results to the MTG for visualization:
-    attach_light_series!(
-        scene,
-        series;
-        fields=[:incident_par_flux, :absorbed_par_flux, :absorbed_par_energy, :absorbed_nir_flux, :absorbed_nir_energy, :sky_fraction, :area],
-    )
+    # attach_light_series!(
+    #     scene,
+    #     series;
+    #     fields=[:incident_par_flux, :absorbed_par_flux, :absorbed_par_energy, :absorbed_nir_flux, :absorbed_nir_energy, :sky_fraction, :area],
+    # )
 
     # Adapting variables for PlantBiophysics :
     # MultiScaleTreeGraph.transform!(
