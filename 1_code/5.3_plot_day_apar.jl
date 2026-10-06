@@ -8,6 +8,7 @@ using ArchimedLight
 using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
 using AlgebraOfGraphics, DataFrames, Statistics, CSV
 using PlantBiophysics, PlantSimEngine
+# using Plot
 
 include("simulation.jl")
 
@@ -30,10 +31,15 @@ begin
     ax1 = Axis(f[1, 1], title="Config $configID", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)", xticks=0:2:24)
     for plant_id in range(minimum(values_dfs[configID].object_id), maximum(values_dfs[configID].object_id))
         ndf = filter(:object_id => ==(plant_id), values_dfs[configID])
-        plt_apar = data(ndf) *
-            mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
-            visual(Lines, color=:red, linewidth=3)
+        plt_apar =
+            data(ndf) *
+            mapping(
+                :step_number => (x -> (x-1)) => "Hour",
+                :Ra_PAR_q_sum => "Absorbed PAR energy"
+            ) *
+            visual(Lines, alpha=0.05, color=:blue)
         draw!(ax1, plt_apar)
+        # plot!(ax1, ndf.step_number, ndf.Ra_PAR_q_sum)
     end
 
     # for configID in configIDs

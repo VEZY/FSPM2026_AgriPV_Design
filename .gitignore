@@ -52,3 +52,9 @@ STICS-SOIL-CROP-MODEL-10.5.0.html
 
 # Shell files (for cluster run)
 *.sh
+
+# VS Code configuration files
+.vscode
+
+# log files (for cluster runs)
+log.*
