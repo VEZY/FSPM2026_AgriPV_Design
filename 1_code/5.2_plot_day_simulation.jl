@@ -16,16 +16,20 @@ configIDs = range(0,3)
 # TODO
 # values_dict = read_component_values()
 
-plant_df = AbstractArray{DataFrame, lenght(configIDs)}
-plant_df_avg = AbstractArray{DataFrame, lenght(configIDs)}
-apar_sum_plant = AbstractArray{DataFrame, lenght(configIDs)}
+# plant_df = AbstractArray{DataFrame, lenght(configIDs)}
+# plant_df_avg = AbstractArray{DataFrame, lenght(configIDs)}
+# apar_sum_plant = AbstractArray{DataFrame, lenght(configIDs)}
+
+plant_df = []
+plant_df_avg = []
+apar_sum_plant = []
 
 for configID in configIDs
-    plant_df[configID] = CSV.read("2_outputs/simulations/daily/apar_config_$(configID)_$(day).csv", DataFrame)
-    apar_sum_plant[configID] = combine(groupby(plant_df[configID], :plant_id), :apar => sum => :apar_sum)
-    minimum(apar_sum_plant[configID].apar_sum), maximum(apar_sum_plant[configID].apar_sum), mean(apar_sum_plant[configID].apar_sum)
-    minimum(apar_sum_plant[configID].apar_sum) / maximum(apar_sum_plant[configID].apar_sum)
-    plant_df_avg[configID] = combine(groupby(plant_df[configID], :date), :apar => mean => :apar_mean)
+    push!(plant_df, CSV.read("2_outputs/simulations/daily/apar_config_$(configID)_$(day).csv", DataFrame))
+    push!(apar_sum_plant, combine(groupby(plant_df[end], :plant_id), :apar => sum => :apar_sum))
+    minimum(apar_sum_plant[end].apar_sum), maximum(apar_sum_plant[end].apar_sum), mean(apar_sum_plant[end].apar_sum)
+    minimum(apar_sum_plant[end].apar_sum) / maximum(apar_sum_plant[end].apar_sum)
+    push!(plant_df_avg, combine(groupby(plant_df[end], :date), :apar => mean => :apar_mean))
 end
 
 # Make the plot of aPAR average with all configurations
@@ -35,15 +39,15 @@ begin
     ax = Axis(f[1, 1], title="Average assimilation over the day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)", xticks=0:2:24)
 
     for configID in configIDs
-        plt = data(plant_df) *
-            mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
-            visual(Lines, alpha=0.05)
-        plant_df_avg = combine(groupby(plant_df, :date), :assimilation => mean => :assimilation_mean)
-        plt_avg = data(plant_df_avg) *
+        # plt = data(plant_df[configID]) *
+        #     mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
+        #     visual(Lines, alpha=0.05)
+        plant_df_avg[configID] = combine(groupby(plant_df[configID], :date), :assimilation => mean => :assimilation_mean)
+        plt_avg = data(plant_df_avg[configID]) *
             mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
             visual(Lines, color=:red, linewidth=3)
 
-        draw!(ax, plt_avg)
+        draw!(ax, plt_avg, label="Config $configID")
     end
 
     # hidedecorations!(ax_inset)

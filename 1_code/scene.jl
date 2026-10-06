@@ -114,7 +114,7 @@ function agripv_scene(;
                 group="wheat",
                 id=i + 1,
                 at=((row + 0.5) * interrow, (col + 0.5) * intrarow, 0.0),
-                rotate=(z=randn() * 5.0,),
+                rotate=(z=randn() * 50.0,),
                 deg=true,
             )
         end

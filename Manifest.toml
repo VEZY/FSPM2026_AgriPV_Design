@@ -194,13 +194,12 @@ version = "1.11.0"
 
 [[deps.Atomix]]
 deps = ["UnsafeAtomics"]
-git-tree-sha1 = "c8394f78f55a9090bcd6651b1a2afd1a2449f416"
+git-tree-sha1 = "aa7d720632c3bf29efff118c744c67f8431dff66"
 registries = "General"
 uuid = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
-version = "1.4.0"
+version = "1.6.0"
 
     [deps.Atomix.extensions]
-    AtomixCUDACoreExt = "CUDACore"
     AtomixOpenCLExt = "OpenCL"
     AtomixoneAPIExt = "oneAPI"
 

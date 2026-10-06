@@ -25,7 +25,7 @@ function ConfigPV(;
 end
 
 function get_pvconfig(id)
-    doe = CSV.read("0_simulations/1_doe_flat_panels.csv", DataFrame)
+    doe = CSV.read("0_simulations/1.0_doe_flat_panels.csv", DataFrame)
     filter!(x -> x.configID == id, doe)
 
     if isempty(doe)
