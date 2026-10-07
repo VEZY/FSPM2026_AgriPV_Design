@@ -1,76 +1,67 @@
-using Colors # For color definitions
-using Agrivoltaics # For the solar panel structure and mesh generation
-using GeometryBasics # For geometry
-using MultiScaleTreeGraph # For the MTG data structure
-using PlantGeom # For the growth and visualization API
-using GLMakie
-using ArchimedLight
-using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
-using AlgebraOfGraphics, DataFrames, Statistics, CSV
-using PlantBiophysics, PlantSimEngine
+using GLMakie, PlantGeom
 
-include("simulation.jl")
-
-configIDs = range(0,3)
-
-# TODO
-# values_dict = read_component_values()
-
-# plant_df = AbstractArray{DataFrame, lenght(configIDs)}
-# plant_df_avg = AbstractArray{DataFrame, lenght(configIDs)}
-# apar_sum_plant = AbstractArray{DataFrame, lenght(configIDs)}
-
-plant_df = []
-plant_df_avg = []
-apar_sum_plant = []
-
-for configID in configIDs
-    push!(plant_df, CSV.read("2_outputs/simulations/daily/apar_config_$(configID)_$(day).csv", DataFrame))
-    push!(apar_sum_plant, combine(groupby(plant_df[end], :plant_id), :apar => sum => :apar_sum))
-    minimum(apar_sum_plant[end].apar_sum), maximum(apar_sum_plant[end].apar_sum), mean(apar_sum_plant[end].apar_sum)
-    minimum(apar_sum_plant[end].apar_sum) / maximum(apar_sum_plant[end].apar_sum)
-    push!(plant_df_avg, combine(groupby(plant_df[end], :date), :apar => mean => :apar_mean))
+if !isdefined(@__MODULE__, :attach_outputs!)
+    include("simulation_outputs.jl")
 end
+isdefined(@__MODULE__, :load_day_outputs) || include("saved_simulation.jl")
 
-# Make the plot of aPAR average with all configurations
-
-begin
-    f = Figure(size=(900, 700))
-    ax = Axis(f[1, 1], title="Average assimilation over the day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)", xticks=0:2:24)
-
-    for configID in configIDs
-        # plt = data(plant_df[configID]) *
-        #     mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
-        #     visual(Lines, alpha=0.05)
-        plant_df_avg[configID] = combine(groupby(plant_df[configID], :date), :assimilation => mean => :assimilation_mean)
-        plt_avg = data(plant_df_avg[configID]) *
-            mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
-            visual(Lines, color=:red, linewidth=3)
-
-        draw!(ax, plt_avg, label="Config $configID")
+function _output_plot_range(table, variable, timestep)
+    values = Float64[value for (step, value) in zip(table.timestep, table[!, variable])
+                               if step == timestep && value isa Real && isfinite(value)]
+    isempty(values) && throw(ArgumentError("No finite $variable values at timestep $timestep."))
+    lower, upper = extrema(values)
+    if lower == upper
+        # PlantViz normalizes by upper-lower; zero nighttime radiation must
+        # also have a nonzero display range.
+        iszero(lower) && return (0.0, 1.0)
+        padding = abs(lower) * 0.05
+        return (lower - padding, upper + padding)
     end
-
-    # hidedecorations!(ax_inset)
-    f
+    return (lower, upper)
 end
-save("2_outputs/daily_apar_crop_3d.png", f, update=false, px_per_unit=3.0)
 
+"""Reload a saved CSV, rebuild its scene and plot one variable at one timestep."""
+function plot_saved_output(; config_id, day, variable=:A, timestep=13,
+    table=:leaves, output_dir=_agripv_daily_output_dir(), kwargs...)
+    saved = load_day_outputs(; config_id, day, output_dir, tables=(table,))
+    return plot_output(saved.scene.mtg, getproperty(saved, table); variable, timestep, kwargs...)
+end
 
-CSV.write("2_outputs/daily_apar_crop_horizontal_design.csv", plant_df_0)
-CSV.write("2_outputs/daily_apar_crop_tilted_design.csv", plant_df)
+"""
+    plot_output(mtg, table; variable=:A, timestep=13, label=string(variable), ...)
 
-plant_df_0 = CSV.read("2_outputs/daily_apar_crop_horizontal_design.csv", DataFrame)
-plant_df = CSV.read("2_outputs/daily_apar_crop_tilted_design.csv", DataFrame)
+Attach one output snapshot by MTG node ID and color its geometry with PlantViz.
+Use `result.leaves` for A/temperature/transpiration and `result.light` for
+radiation on leaves, stems, panels and ground. For a plant subtree, filter the
+table by `plant_id` first. Plant summaries attach to Plant nodes, which have
+no mesh themselves. Execute through Kaimon with `mt=true` for GLMakie.
+"""
+function plot_output(mtg, table;
+    variable=:A, timestep=13, label=string(variable), colorrange=nothing,
+    colormap=:thermal, color_missing=:gray85, kwargs...)
+    range = isnothing(colorrange) ? _output_plot_range(table, variable, timestep) : colorrange
+    all(isfinite, range) && first(range) < last(range) ||
+        throw(ArgumentError("colorrange must be finite and strictly increasing."))
+    # PlantViz appends missing colors into a Colorant vector directly.
+    missing_color = Makie.to_color(color_missing)
+    attach_outputs!(mtg, table; timestep, variables=(variable,))
+    figure, axis, plot = plantviz(mtg;
+        color=variable, color_mode=:node, colorrange=range, colormap,
+        color_missing=missing_color, kwargs...)
+    PlantGeom.colorbar(figure[1, 2], plot; label)
+    return figure, axis, plot
+end
 
-apar_sum_plant_0 = combine(groupby(plant_df_0, :plant_id), :apar => sum => :apar_sum)
-apar_sum_plant_ref = combine(groupby(plant_df, :plant_id), :apar => sum => :apar_sum)
-minimum(apar_sum_plant_0.apar_sum), maximum(apar_sum_plant_0.apar_sum), mean(apar_sum_plant_0.apar_sum)
-minimum(apar_sum_plant_ref.apar_sum), maximum(apar_sum_plant_ref.apar_sum), mean(apar_sum_plant_ref.apar_sum)
+# Or after result = day_simulation(...):
+# f, ax, p = plot_output(result.scene.mtg, result.leaves;
+#     variable=:A, timestep=13, label="Net assimilation (μmol CO₂ m⁻² s⁻¹)")
+# f, ax, p = plot_output(result.scene.mtg, result.light;
+#     variable=:Ri_PAR_f, timestep=13, label="Incident PAR (W m⁻²)")
 
-minimum(apar_sum_plant_0.apar_sum) / maximum(apar_sum_plant_0.apar_sum)
+config_id = 1
+day = Date(2025, 7, 2)
+variable = :Ra_PAR_f
+timestep = 12
+f, ax, p = plot_saved_output(; config_id, day, variable, timestep, table=:light, output_dir=_agripv_daily_output_dir())
 
-
-plant_df_0_avg = combine(groupby(plant_df_0, :date), :apar => mean => :apar_mean)
-plant_df_avg = combine(groupby(plant_df, :date), :apar => mean => :apar_mean)
-
-horizontal_design_compared_to_ref = (sum(plant_df_0_avg.apar_mean) / sum(plant_df_avg.apar_mean) * 100) - 100
+f

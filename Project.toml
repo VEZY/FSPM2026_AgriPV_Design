@@ -29,3 +29,4 @@ TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 
 [sources]
 Agrivoltaics = {rev = "main", url = "https://github.com/VEZY/Agrivoltaics.jl#codev"}
+PlantBiophysics = {rev = "fix-root-in-fvcb", url = "https://github.com/VEZY/PlantBiophysics.jl"}
