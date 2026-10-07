@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "70b7b8e4b7d85c75859b119ec2e7383929e3ad99"
+project_hash = "84acb5f25707bb110c2bc6ae358977cd668d3514"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -66,10 +66,10 @@ version = "0.1.45"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra"]
-git-tree-sha1 = "7c2c19b5a26e601634bf718490b89d59685f122e"
+git-tree-sha1 = "0d64e8eff17936a5e10e61a9d054e1f716792da9"
 registries = "General"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "4.7.1"
+version = "4.7.3"
 weakdeps = ["SparseArrays", "StaticArrays"]
 
     [deps.Adapt.extensions]
@@ -1246,10 +1246,10 @@ version = "1.12.0"
 
 [[deps.KernelAbstractions]]
 deps = ["Adapt", "Atomix", "InteractiveUtils", "MacroTools", "PrecompileTools", "Requires", "StaticArrays", "UUIDs"]
-git-tree-sha1 = "920671fc8e3be4daf278442bf0bd5cfb46ebac48"
+git-tree-sha1 = "0d0172d662154a2d8e0150c265e75579029f8baf"
 registries = "General"
 uuid = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
-version = "0.9.43"
+version = "0.9.44"
 
     [deps.KernelAbstractions.extensions]
     EnzymeExt = "EnzymeCore"
@@ -1744,10 +1744,17 @@ version = "0.3.3"
 
 [[deps.PlantBiophysics]]
 deps = ["CSV", "DataFrames", "Dates", "LsqFit", "OrderedCollections", "PlantMeteo", "PlantSimEngine", "RecipesBase", "Statistics", "YAML"]
-git-tree-sha1 = "d6dda35ae6a8525ea1d69a80f2ffdab98457d860"
-registries = "General"
+git-tree-sha1 = "21ee627bb05f647cf8272ce4af17f869a7b9c38f"
+repo-rev = "fix-root-in-fvcb"
+repo-url = "https://github.com/VEZY/PlantBiophysics.jl"
 uuid = "7ae8fcfa-76ad-4ec6-9ea7-5f8f5e2d6ec9"
 version = "0.18.0"
+
+    [deps.PlantBiophysics.extensions]
+    PlantBiophysicsMonteCarloMeasurementsExt = "MonteCarloMeasurements"
+
+    [deps.PlantBiophysics.weakdeps]
+    MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
 
 [[deps.PlantGeom]]
 deps = ["ColorSchemes", "Colors", "CoordinateTransformations", "EzXML", "FixedPointNumbers", "GeometryBasics", "LinearAlgebra", "MultiScaleTreeGraph", "OrderedCollections", "Printf", "RecipesBase", "Rotations", "StaticArrays", "Tables", "UUIDs", "Unitful"]
@@ -2678,10 +2685,10 @@ version = "2.0.4+0"
 
 [[deps.libpng_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "32781be40fe86735af02eae0dd22754e4b5f779d"
+git-tree-sha1 = "1fcd6cf05d23adab0b5ffc496d020537215751dc"
 registries = "General"
 uuid = "b53b4c65-9356-5827-b1ea-8c7a1a84506f"
-version = "1.6.59+0"
+version = "1.6.59+1"
 
 [[deps.libsixel_jll]]
 deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "Libdl", "libpng_jll"]
