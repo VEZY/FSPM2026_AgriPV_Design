@@ -12,7 +12,7 @@ include("simulation.jl")
 include("pvconfig.jl")
 
 day = Date(2025, 7, 2)
-configIDs = range(0, 0)
+configIDs = range(0, 3)
 
 for configID in configIDs
     # options.scene_rotation_deg = get_pvconfig(configID).panel_orientation

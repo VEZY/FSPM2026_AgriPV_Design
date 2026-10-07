@@ -1,16 +1,54 @@
 using GLMakie
 using PlantGeom
 using Colors
+using ArchimedLight
 
 include("scene.jl")
 include("pvconfig.jl")
 
 configID = 0
 
+
+function tile_geometry!(scene, nx, ny)
+    models = agripv_models()  # or MakeScene.models("wheat")
+    options = LightOptions(
+        turtle_sectors=16,
+        pixel_size=0.01,
+        toricity=true,
+        scattering=true,
+    )
+
+    scene = ArchimedLight.tile_light_geometry(scene, models, options; nx=nx, ny=ny)
+
+    # tiled_mtg = copy(scene.mtg)
+    # for i in 0:4  # 5x along x-axis
+    #     for j in 0:1  # 2x along y-axis
+    #         if i == 0 && j == 0
+    #             continue  # Skip the original (already included)
+    #         end
+    #         # Translate all nodes in the scene by (i * scene_width, j * scene_height, 0)
+    #         scene_width = scene.domain[3]  # x-dimension of the scene
+    #         scene_height = scene.domain[4]  # y-dimension of the scene
+    #         traverse!(scene.mtg) do node
+    #             if haskey(node, :geometry)
+    #                 new_geom = deepcopy(node[:geometry])
+    #                 # Apply translation to the geometry
+    #                 new_geom.transform = Translation(i * scene_width, j * scene_height, 0.0) ∘ new_geom.transform
+    #                 # Add the translated geometry to the tiled MTG
+    #                 # (This part depends on how PlantGeom handles geometry transformations)
+    #             end
+    #         end
+    #     end
+    # end
+
+    return scene
+end
+
+
 config = get_pvconfig(configID)
 
 @time scene = agripv_scene(c=config)
-
+tile_geometry!(scene, 5, 2)
 
 traverse!(scene.mtg) do node
     if symbol(node) == :LeafSection
