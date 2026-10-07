@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "70b7b8e4b7d85c75859b119ec2e7383929e3ad99"
+project_hash = "84acb5f25707bb110c2bc6ae358977cd668d3514"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -1726,8 +1726,9 @@ version = "0.3.3"
 
 [[deps.PlantBiophysics]]
 deps = ["CSV", "DataFrames", "Dates", "LsqFit", "OrderedCollections", "PlantMeteo", "PlantSimEngine", "RecipesBase", "Statistics", "YAML"]
-git-tree-sha1 = "d6dda35ae6a8525ea1d69a80f2ffdab98457d860"
-registries = "General"
+git-tree-sha1 = "9b900ef7902d84cf28232d215fc963ea3ca8fcd3"
+repo-rev = "fix-root-in-fvcb"
+repo-url = "https://github.com/VEZY/PlantBiophysics.jl"
 uuid = "7ae8fcfa-76ad-4ec6-9ea7-5f8f5e2d6ec9"
 version = "0.18.0"
 

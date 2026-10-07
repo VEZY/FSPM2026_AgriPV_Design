@@ -56,7 +56,7 @@ function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple())
         ),
     )
     stomatal_conductance = ModelSpec(
-        # Small positive intercept requested for this scenario. The local
+        # Small positive intercept requested for this scenario. The
         # PlantBiophysics source fix handles zero/low-light singularities.
         # Retain the existing gs_min=0.001 mol CO₂ m⁻² s⁻¹ conductance floor.
         Medlyn(1e-6, 5.8); name=:stomatal_conductance, on=active_sections,
