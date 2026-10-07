@@ -5,11 +5,12 @@ using ArchimedLight
 
 include("scene.jl")
 include("pvconfig.jl")
+include("meta4glmakie.jl")
 
-configID = 0
+configID = 2
 
 
-function tile_geometry!(scene, nx, ny)
+function tile_geometry(scene; nx=5, ny=2)
     models = agripv_models()  # or MakeScene.models("wheat")
     options = LightOptions(
         turtle_sectors=16,
@@ -18,7 +19,7 @@ function tile_geometry!(scene, nx, ny)
         scattering=true,
     )
 
-    scene = ArchimedLight.tile_light_geometry(scene, models, options; nx=nx, ny=ny)
+    tiled_scene = ArchimedLight.tile_light_geometry(scene, models, options; nx=nx, ny=ny)
 
     # tiled_mtg = copy(scene.mtg)
     # for i in 0:4  # 5x along x-axis
@@ -41,14 +42,14 @@ function tile_geometry!(scene, nx, ny)
     #     end
     # end
 
-    return scene
+    return tiled_scene
 end
 
 
 config = get_pvconfig(configID)
 
 @time scene = agripv_scene(c=config)
-tile_geometry!(scene, 5, 2)
+# tile_scene = tile_geometry(scene)
 
 traverse!(scene.mtg) do node
     if symbol(node) == :LeafSection
@@ -64,22 +65,29 @@ traverse!(scene.mtg) do node
     end
 end
 
-let
-    f = Figure(size=(900, 700))
+begin
+    f = Figure(size=(900, 700), backgroundcolor=(:white, 0.01))
     ax = Axis3(
         f[1, 1],
         aspect=:data,
-        title="Config $configID",
+        # title="Config $configID",
         xlabel="x (m)",
         ylabel="y (m)",
         zlabel="z (m)",
+        xspinesvisible=false,
+        yspinesvisible=false,
+        zspinesvisible=false
     )
 
     plantviz!(ax, scene.mtg; color=:color)
     ax.azimuth[]=deg2rad(45)
     ax.elevation[]=deg2rad(30)
+    hidedecorations!(ax)
     f
 end
+save("2_outputs/config_$(configID)_nospines.png", alpha_colorbuffer(f), dpi=300)
+# save("2_outputs/config_$(configID)_noaxis.png", background=false)
+# save("2_outputs/config_$(configID).png", alpha_colorbuffer(f), update=false, px_per_unit=3.0)
 
 
 # begin

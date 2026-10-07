@@ -1,8 +1,8 @@
 using Glob, CSV
-using Dates, DataFrames, DataFramesMeta
+using Dates, DataFrames
 using AlgebraOfGraphics
 using GLMakie
-using Statistics
+using Statistics, DataFramesMeta
 
 sources = glob("2_outputs/simulations/daily/plants_*.csv")
 regex = r"plants_config_(\d+)_(\d+-\d+-\d+)"
@@ -47,6 +47,7 @@ aPPFD =
     mapping(
         :datetime => (x -> DateTime(x)) => "Time",
         :assimilation_step => "Assimilation per step per plant (μmol plant⁻¹ hour⁻¹)",
+        group = :plant_id,
         layout = :configID
     ) *
     visual(Lines, alpha=0.05) +
@@ -57,7 +58,7 @@ aPPFD =
         :assimilation_step_mean => "Assimilation per step per plant (μmol plant⁻¹ hour⁻¹)",
         layout = :configID
     ) *
-    visual(Lines, color=:red, linewidth=3)
+    visual(Lines, color=:red, linewidth=2)
 
 draw!(f, aPPFD)
 save("2_outputs/day_step_assimilation_per_config.png", f, update=false, px_per_unit=3.0)

@@ -56,3 +56,6 @@ log.*
 
 # VS Code configuration files
 .vscode
+
+# Presentation folder
+3_presentation
