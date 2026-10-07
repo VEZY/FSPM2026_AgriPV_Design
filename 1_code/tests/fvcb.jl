@@ -48,7 +48,8 @@ const ZERO_LIGHT_BOUNDARY_TEST_RESULT = @testset "Zero light also handles zero r
         @test all(isfinite, (state.A, state.Gₛ, state.Cᵢ))
         @test state.A == -expected_respiration(temperature; model)
         @test state.Gₛ == 0.001
-        @test state.Cᵢ == state.Cₛ
+        @test state.Cᵢ ≈ state.Cₛ - state.A / state.Gₛ
+        @test iszero(state.A) ? state.Cᵢ == state.Cₛ : state.Cᵢ > state.Cₛ
     end
 end
 
@@ -58,7 +59,8 @@ const DARK_TEST_RESULT = @testset "Original Fvcb at zero light with the configur
         @test isfinite(state.A) && isfinite(state.Gₛ) && isfinite(state.Cᵢ)
         @test state.A == -expected_respiration(temperature)
         @test state.Gₛ == 0.001
-        @test state.Cᵢ == state.Cₛ
+        @test state.Cᵢ ≈ state.Cₛ - state.A / state.Gₛ
+        @test iszero(state.A) ? state.Cᵢ == state.Cₛ : state.Cᵢ > state.Cₛ
     end
 end
 
@@ -68,7 +70,8 @@ const LOW_LIGHT_TEST_RESULT = @testset "Near-zero absorbed light remains finite 
         @test all(isfinite, (state.A, state.Gₛ, state.Cᵢ))
         @test state.A ≈ -expected_respiration(temperature) atol=1e-3
         @test state.Gₛ == 0.001
-        @test state.Cᵢ == state.Cₛ
+        @test state.Cᵢ ≈ state.Cₛ - state.A / state.Gₛ
+        @test iszero(state.A) ? state.Cᵢ == state.Cₛ : state.Cᵢ > state.Cₛ
     end
 end
 

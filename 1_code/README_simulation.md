@@ -213,26 +213,26 @@ it does not add plant respiration, root/stem exchange, or hydraulic feedbacks.
 
 The original photosynthetic parameters and Medlyn slope remain assumptions of
 this scenario. Medlyn uses the requested `g0=1e-6` mol CO₂ m⁻² s⁻¹ and retains
-its existing `gs_min=0.001` conductance floor. This positive intercept alone
-does not fix PlantBiophysics 0.18's analytical singularity: 54 of 126 dark
-temperature cases between 15 and 40 °C still produced NaNs, and the full day
-failed. The source fix sets gross electron-transport assimilation to zero when
-electron transport is zero or its analytical intercellular CO₂ root is
-nonphysical (≤ 0), consistent with the existing Rubisco guard. Zero-light net
-assimilation is `A = -Rd`; nighttime respiration is preserved. This is a
-numerical correction and parameter choice, not calibration against measurements.
+its existing `gs_min=0.001` conductance floor. The PlantBiophysics branch solves
+net assimilation together with the actual conductance, including its floor.
+At zero light, `A = -Rd`; below the compensation point, a positive gross
+photosynthetic contribution is retained even when net `A` remains negative.
+Intercellular CO₂ follows `Cᵢ = Cₛ - A/Gₛ`, so `Cᵢ > Cₛ` during CO₂ release.
+The analytical coupling also supports Tuzet and directly prescribed conductance
+with ConstantGs. This corrects the numerical coupling; it does not calibrate
+nighttime respiration or stomatal parameters against measurements.
 Structural checks do not establish predictive accuracy.
 
 ## Validation and performance
 
-On 2026-10-07, the complete PlantBiophysics package suite passed 1,198 checks
-through Kaimon's dedicated test runner with Julia 1.13.1, including the 610 FvCB
-regressions transferred to the package. The daily evaluation fixture now declares
-its time-column schema explicitly for CSV 0.10 and 1.x. This project's 897 checks
-also passed after restarting Kaimon with the Git dependency at commit
-[`2e3da9a`](https://github.com/VEZY/PlantBiophysics.jl/commit/2e3da9a72fc4003c4d8025dd0901f274d902016b).
+On 2026-10-07, the complete PlantBiophysics package suite passed 2,086 checks
+through Kaimon's dedicated test runner with Julia 1.13.1, including 1,495 FvCB
+regressions. The daily evaluation fixture declares its time-column schema
+explicitly for CSV 0.10 and 1.x. This project's 1,038 checks also passed after
+restarting Kaimon with the Git dependency at commit
+[`c9be0d9`](https://github.com/VEZY/PlantBiophysics.jl/commit/c9be0d9e9adac097d37638d0dab29dcfa69e6795).
 The loaded FvCB method was verified against that dependency's source tree,
-`9b900ef7902d84cf28232d215fc963ea3ca8fcd3`, which is recorded in Manifest.toml.
+`21ee627bb05f647cf8272ce4af17f869a7b9c38f`, which is recorded in Manifest.toml.
 
 Execute `include("1_code/tests/runtests.jl")` through Kaimon. Tests compare the
 wide collector with PlantSimEngine's retained publications, including native
@@ -242,15 +242,37 @@ variable durations, empty plants, cumulative state and continuation. MTG checks
 use engine IDs different from node IDs and repeated OBJ IDs, and verify merged
 leaf columns, ancestor identity, snapshot attachment and validation before writing.
 
-For a bounded performance comparison on the current scene:
+A fresh full-scene comparison on 2026-10-07 used the same configuration 0,
+2025-07-02 forcing, 24 hourly steps, geometry, and retained output requests.
+After compilation, the previous guard-only dependency took 93.03 s; the signed
+coupling correction took 92.46 s. Total allocated bytes were 14.92 GB in both
+runs. These are individual local measurements, so the small timing difference
+is not evidence of a speedup. A separate process-kernel benchmark over five
+light levels measured a median of 89.7 ns/call before and 101.8 ns/call after
+(one million calls, five repetitions), with no additional per-call allocations.
+The analytical correction introduced no material slowdown in this full scene.
+All 342,912 leaf rows had finite `A`, `Tₗ`, `Gₛ`, and `λE`. The exported tables
+contained 1,115,160 light rows and 7,296 plant rows. At the final nighttime
+step, all 14,288 active sections had finite `Cᵢ` above `Cₛ` while respiring;
+the maximum absolute diffusion residual was 2.22e-16 μmol CO₂ m⁻² s⁻¹.
+Leaf, light, and plant collection took 3.32 s, 4.93 s, and 0.19 s respectively.
+
+For a bounded timing check on the current scene, execute through Kaimon:
 
 ```julia
-include("1_code/benchmark_output_collection.jl")
-benchmark_output_collection(steps=1)
+include("1_code/simulation.jl")
+include("1_code/pvconfig.jl")
+setup = prepare_day_simulation(pvconfig=get_pvconfig(0), day=Date(2025, 7, 2))
+requests = [plant_output_requests(); leaf_output_requests(); light_output_requests()]
+@time sim = run!(setup.coupled; steps=1, outputs=requests)
+dates = [row.date for row in setup.meteo]
+@time leaves = collect_leaf_outputs(sim, setup.coupled; dates, meteo=setup.meteo)
+@time light = collect_light_outputs(sim, setup.coupled; dates)
+@time plants = collect_plant_outputs(sim, setup.coupled; dates)
 ```
 
-The benchmark reports Julia/PlantSimEngine versions, timings, total allocated
-bytes, and row counts. Total allocated bytes are not peak resident memory.
+Warm compilation before comparing timings. Total allocated bytes reported by
+Julia's `@time` are not peak resident memory.
 
 Measured on 2026-10-06 with Julia 1.13.1, PlantSimEngine 0.15.0,
 PlantBiophysics 0.18.0, ArchimedLight 0.2.0 and PlantMeteo 0.9.1 in this project:

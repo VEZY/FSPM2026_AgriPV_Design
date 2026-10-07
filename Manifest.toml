@@ -1726,11 +1726,17 @@ version = "0.3.3"
 
 [[deps.PlantBiophysics]]
 deps = ["CSV", "DataFrames", "Dates", "LsqFit", "OrderedCollections", "PlantMeteo", "PlantSimEngine", "RecipesBase", "Statistics", "YAML"]
-git-tree-sha1 = "9b900ef7902d84cf28232d215fc963ea3ca8fcd3"
+git-tree-sha1 = "21ee627bb05f647cf8272ce4af17f869a7b9c38f"
 repo-rev = "fix-root-in-fvcb"
 repo-url = "https://github.com/VEZY/PlantBiophysics.jl"
 uuid = "7ae8fcfa-76ad-4ec6-9ea7-5f8f5e2d6ec9"
 version = "0.18.0"
+
+    [deps.PlantBiophysics.extensions]
+    PlantBiophysicsMonteCarloMeasurementsExt = "MonteCarloMeasurements"
+
+    [deps.PlantBiophysics.weakdeps]
+    MonteCarloMeasurements = "0987c9cc-fe09-11e8-30f0-b96dd679fdca"
 
 [[deps.PlantGeom]]
 deps = ["ColorSchemes", "Colors", "CoordinateTransformations", "EzXML", "FixedPointNumbers", "GeometryBasics", "LinearAlgebra", "MultiScaleTreeGraph", "OrderedCollections", "Printf", "RecipesBase", "Rotations", "StaticArrays", "Tables", "UUIDs", "Unitful"]
