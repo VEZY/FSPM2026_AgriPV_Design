@@ -10,19 +10,22 @@ using PlantBiophysics, PlantSimEngine
 
 include("simulation.jl")
 include("pvconfig.jl")
+include("saved_simulation.jl")
 
 day = Date(2025, 7, 2)
-configIDs = range(0, 0)
+# configIDs = range(0, 0)
+configIDs = 0:3
 
 for configID in configIDs
+    # configID = 0
     # options.scene_rotation_deg = get_pvconfig(configID).panel_orientation
     # row = prepare_meteo(meteo_rows, options);
 
     println("Config $(configID)...")
-    sim, series, plant_df = day_simulation(pvconfig=get_pvconfig(configID), day=day)
+    result = day_simulation(pvconfig=get_pvconfig(configID), day=day)
     println("\tDONE")
 
-    write_component_values("2_outputs/simulations/daily/results_config$(configID)_$(day).csv", sim, series)
+    # write_component_values("2_outputs/simulations/daily/results_config$(configID)_$(day).csv", sim, series)
 
-    CSV.write("2_outputs/simulations/daily/apar_config_$(configID)_$(day).csv", plant_df)
+    write_day_outputs(result; config_id=configID)
 end
