@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "84acb5f25707bb110c2bc6ae358977cd668d3514"
+project_hash = "53d587f4742ca41274c8590658c2a066551387dc"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -295,6 +295,12 @@ registries = "General"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.18.8+0"
 
+[[deps.Chain]]
+git-tree-sha1 = "339237319ef4712e6e5df7758d0bccddf5c237d9"
+registries = "General"
+uuid = "8be319e6-bccf-4806-a6f7-6fae938471bc"
+version = "0.4.10"
+
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
 git-tree-sha1 = "12177ad6b3cad7fd50c8b3825ce24a99ad61c18f"
@@ -481,6 +487,13 @@ git-tree-sha1 = "5fab31e2e01e70ad66e3e24c968c264d1cf166d6"
 registries = "General"
 uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 version = "1.8.2"
+
+[[deps.DataFramesMeta]]
+deps = ["Chain", "DataFrames", "MacroTools", "Reexport"]
+git-tree-sha1 = "29e71b438935977f8905c0cb3a8a84475fc70101"
+registries = "General"
+uuid = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
+version = "0.9.1"
 
 [[deps.DataStrings]]
 git-tree-sha1 = "b8032263d364177a0b192ea15f277df4e6ab07e2"

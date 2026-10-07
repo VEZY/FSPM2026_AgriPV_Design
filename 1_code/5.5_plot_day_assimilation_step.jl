@@ -1,7 +1,8 @@
 using Glob, CSV
-using Dates, DataFrames
+using Dates, DataFrames, DataFramesMeta
 using AlgebraOfGraphics
 using GLMakie
+using Statistics
 
 sources = glob("2_outputs/simulations/daily/plants_*.csv")
 regex = r"plants_config_(\d+)_(\d+-\d+-\d+)"
@@ -14,6 +15,11 @@ for src in sources
 end
 df = CSV.read(sources, DataFrame; source=:configID => configIDs)
 
+# Compute mean per configID and datetime
+df_mean = @chain df begin
+    groupby([:configID, :datetime])
+    @combine :assimilation_step_mean = mean(coalesce.(:assimilation_step, 0.0))
+end
 
 f = Figure(size=(900, 700))#, title="Absorbed PAR for each config over a day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)")
 
@@ -40,11 +46,18 @@ aPPFD =
     data(df) *
     mapping(
         :datetime => (x -> DateTime(x)) => "Time",
-        # :timestep => "Timestep",
         :assimilation_step => "Assimilation per step per plant (μmol plant⁻¹ hour⁻¹)",
         layout = :configID
     ) *
-    visual(Lines, alpha=0.05)
+    visual(Lines, alpha=0.05) +
+
+    data(df_mean) *
+    mapping(
+        :datetime => (x -> DateTime(x)) => "Time",
+        :assimilation_step_mean => "Assimilation per step per plant (μmol plant⁻¹ hour⁻¹)",
+        layout = :configID
+    ) *
+    visual(Lines, color=:red, linewidth=3)
 
 draw!(f, aPPFD)
 save("2_outputs/day_step_assimilation_per_config.png", f, update=false, px_per_unit=3.0)
