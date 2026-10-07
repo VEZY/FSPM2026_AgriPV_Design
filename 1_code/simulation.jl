@@ -1,13 +1,17 @@
+using PlantSimEngine, PlantBiophysics, PlantMeteo, DataFrames, CSV, Dates, TableOperations
+using ArchimedLight, PlantMeteo.Tables
+
 include("meteo.jl")
 include("scene.jl")
+if !isdefined(@__MODULE__, :AgripvPlantBalance)
+    include("plant_balance.jl")
+end
+using .AgripvPlantBalance
+include("simulation_outputs.jl")
 
-function day_simulation(; pvconfig, day)
-    models = agripv_models()
-    @time scene = agripv_scene(
-        c=pvconfig,
-        day=day
-    )
-
+"""Build the scene and coupled models without running or materializing outputs."""
+function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple())
+    scene = agripv_scene(; c=pvconfig, day, scene_kwargs...)
     options = LightOptions(
         turtle_sectors=46,
         pixel_size=0.01,
@@ -16,37 +20,34 @@ function day_simulation(; pvconfig, day)
         cache_radiation=true,
         all_in_turtle=true,
         include_sky_fraction=true,
-        scene_rotation_deg=pvconfig.panel_orientation
+        scene_rotation_deg=pvconfig.panel_orientation,
     )
+    meteo = archimed_meteo(get_meteo(day), options)
+    isempty(meteo) && throw(ArgumentError("No meteorology for $day"))
+    light_sim = LightSimulation(scene, agripv_models(); options)
 
-    # Take only the desired day:
-    meteo_rows = get_meteo(day)
-    meteo = archimed_meteo(meteo_rows, options)
-
-    sim = LightSimulation(scene, models; options)
-    # update_options!(
-    #     sim,
-    #     LightOptions(sim.options; scene_rotation_deg=config.panel_orientation),
-    # )
-
+    # Output coverage follows actual geometry, including stems, panels and ground.
+    geometry_ids = Int[]
+    MultiScaleTreeGraph.traverse!(scene.mtg) do node
+        isnothing(node[:geometry]) || push!(geometry_ids, MultiScaleTreeGraph.node_id(node))
+    end
     light_application = ModelSpec(
-        ArchimedLightModel(sim; output_schema=:full,
+        ArchimedLightModel(light_sim; output_schema=:coupling,
             par_energy_to_photon=PlantMeteo.Constants().J_to_umol);
         name=:archimed_light, on=One(scale=:Scene),
-        outputs_to=(
-            OutputTo(Many(scale=:LeafSection, within=SceneScope()); coverage=:exact),
-        ),
+        outputs_to=(OutputTo(Many(id=geometry_ids, within=SceneScope()); coverage=:exact),),
     )
+    active_sections = Many(scale=:LeafSection, kind=:active_leaf)
     photosynthesis = ModelSpec(
         Fvcb(VcMaxRef=120.0, JMaxRef=240.0, RdRef=1.2, TPURef=20.0);
-        name=:photosynthesis, on=Many(scale=:LeafSection),
+        name=:photosynthesis, on=active_sections,
         inputs=(
             :aPPFD => One(within=Self(), application=:archimed_light,
                 var=:aPPFD, policy=HoldLast()),
         ),
     )
     energy_balance = ModelSpec(
-        Monteith(aₛᵥ=2); name=:energy_balance, on=Many(scale=:LeafSection),
+        Monteith(aₛᵥ=2); name=:energy_balance, on=active_sections,
         inputs=(
             :Ra_SW_f => One(within=Self(), application=:archimed_light,
                 var=:Ra_SW_f, policy=HoldLast()),
@@ -55,72 +56,68 @@ function day_simulation(; pvconfig, day)
         ),
     )
     stomatal_conductance = ModelSpec(
-        Medlyn(0.0, 5.8); name=:stomatal_conductance, on=Many(scale=:LeafSection),
+        # Small positive intercept requested for this scenario. The local
+        # PlantBiophysics source fix handles zero/low-light singularities.
+        # Retain the existing gs_min=0.001 mol CO₂ m⁻² s⁻¹ conductance floor.
+        Medlyn(1e-6, 5.8); name=:stomatal_conductance, on=active_sections,
     )
-    initial_status(node) = MultiScaleTreeGraph.symbol(node) == :LeafSection ? Status(d=0.01) : Status() # Characteristic leaf dimension (m); replace with measurements.
+    node_kind(node) = MultiScaleTreeGraph.symbol(node) == :LeafSection ?
+                      (node[:state] == "senescent" ? :senescent_leaf : :active_leaf) : nothing
+    first_forcing = first(meteo)
+    # Declare the shared hard-call trial slots explicitly. These match
+    # Monteith's initialization, which overwrites them before every leaf solve.
+    initial_status(node) = node_kind(node) == :active_leaf ? Status(
+        d=0.01,
+        Tₗ=first_forcing.T - 0.2,
+        Cₛ=first_forcing.Cₐ,
+        A=0.0,
+        Dₗ=PlantMeteo.e_sat(first_forcing.T - 0.2) -
+            PlantMeteo.e_sat(first_forcing.T) * first_forcing.Rh,
+    ) : Status()
 
-    # Parameter sources: Camino et al. (2019), Table 2, Townsend et al. (2018), Table III, and Medlyn et al. (2002), respiration assumption.
-    # wheat USO study (2025), section 2.2, CLM5 documentation, Table 9.1.
+    # Parameter sources retained from the original setup: Camino et al. (2019),
+    # Table 2; Townsend et al. (2018), Table III; Medlyn et al. (2002);
+    # wheat USO study (2025), section 2.2; CLM5 documentation, Table 9.1.
+    # d is the characteristic leaf dimension (m); replace with measurements.
     coupled = CompositeModel(
-        scene.mtg; status=initial_status,
-        applications=(light_application, energy_balance, photosynthesis, stomatal_conductance),
-        environment=meteo
+        scene.mtg; status=initial_status, kind=node_kind,
+        applications=(light_application, energy_balance, photosynthesis,
+            stomatal_conductance, plant_balance_spec()),
+        environment=meteo,
     )
-    simulation = PlantSimEngine.run!(coupled; steps=length(meteo), outputs=:all)
-    outputs = collect_outputs(simulation; sink=DataFrame)
+    return (; coupled, scene, meteo, light_sim)
+end
 
-    # Attach the results to the MTG for visualization:
-    # attach_light_series!(
-    #     scene,
-    #     series;
-    #     fields=[:incident_par_flux, :absorbed_par_flux, :absorbed_par_energy, :absorbed_nir_flux, :absorbed_nir_energy, :sky_fraction, :area],
-    # )
+"""
+    day_simulation(; pvconfig, day, keep_leaves=true, keep_light=true, scene_kwargs=())
 
-    # Adapting variables for PlantBiophysics :
-    # MultiScaleTreeGraph.transform!(
-    #     scene.mtg,
-    #     [:Ra_PAR_f, :Ra_NIR_f] => ((x, y) -> x .+ y) => :Ra_SW_f,
-    #     ignore_nothing=true
-    # )
-
-    # # Simulate energy balance and photosynthesis with PlantBiophysics::
-    # vars = Dict{Symbol,Any}(:Leaf => (:Tₗ, :A, :Gₛ))
-    # models =
-    #     ModelMapping(
-    #         "LeafSection" => (
-    #             Translucent(), # This model reads ArchimedLight outputs one time-step at a time
-    #             Monteith(),
-    #             Fvcb(),
-    #             Medlyn(0.03, 12.0),
-    #             Status(d=0.01) #! update this with the true value in the MTG
-    #         ),
-    #     )
-    # @time outs = PlantSimEngine.run!(scene.mtg, models, meteo, tracked_outputs=vars)
-    # # Writing the outputs back to the MTG for visualization:
-    # for ts_node in groupby(DataFrame(outs[:LeafSection]), :node)
-    #     node = ts_node.node[1]
-    #     node.Tₗ = ts_node.Tₗ
-    #     node.A = ts_node.A
-    #     node.A_per_organ = ts_node.A .* node.area
-    #     node.Gₛ = ts_node.Gₛ
-    # end
-
-    # # Compute the absorbed PAR and A by each plant over the day, by summing the absorbed PAR energy of all the leaves of each plant at each timestep:
-    # plant_df = let
-    #     apar_plant = []
-    #     assimilation_quantity_plant = [] # Assimilation in μmol per plant per timestep, i.e. A (μmol m⁻² s⁻¹) * leaf area (m²) * duration of the timestep (s)
-    #     plan_index = []
-    #     traverse!(scene.mtg) do node
-    #         if symbol(node) == :Plant
-    #             push!(apar_plant, [sum(leaf[timestep] for leaf in descendants(node, :Ra_PAR_q, symbol=:Leaf)) for timestep in 1:length(meteo)] * 1e-6) # Convert from J to MJ
-    #             push!(assimilation_quantity_plant, [sum(leaf[timestep] for leaf in descendants(node, :A_per_organ, symbol=:Leaf)) * Dates.toms(r.duration) * 1e-3 for (timestep, r) in enumerate(meteo)])
-    #             push!(plan_index, fill(node_id(node), length(meteo)))
-    #         end
-    #     end
-    #     DataFrame(plant_id=vcat(plan_index...), date=repeat(meteo.date, outer=length(plan_index)), apar=vcat(apar_plant...), assimilation=vcat(assimilation_quantity_plant...))
-    # end
-
-    return outputs#, plant_df
+Run hourly radiation on all geometry and physiology on active leaf sections.
+Return wide `leaves`, `light` and `plants` DataFrames, plus the simulation,
+scene and meteorology. Each table has one row per source MTG `node_id` and
+`timestep`, with variables as columns. `plant_id` identifies the Plant ancestor.
+Leaf rows combine physiology, radiation and surface-integrated section rates.
+Keep `scene.mtg` to reassociate exported values with its LeafSection nodes.
+Plant quantities are surface weighted and integrate
+actual step durations. Set `keep_leaves=false, keep_light=false` for plant
+summaries alone. No global long-table sort or automatic resampling is needed.
+"""
+function day_simulation(; pvconfig, day, keep_leaves=true, keep_light=true,
+    scene_kwargs=NamedTuple())
+    setup = prepare_day_simulation(; pvconfig, day, scene_kwargs)
+    requests = plant_output_requests()
+    if keep_leaves
+        append!(requests, leaf_output_requests())
+    end
+    if keep_light
+        append!(requests, light_output_requests())
+    end
+    simulation = PlantSimEngine.run!(setup.coupled;
+        steps=length(setup.meteo), outputs=requests)
+    dates = [row.date for row in setup.meteo]
+    plants = collect_plant_outputs(simulation, setup.coupled; dates)
+    leaves = keep_leaves ? collect_leaf_outputs(simulation, setup.coupled; dates, meteo=setup.meteo) : DataFrame()
+    light = keep_light ? collect_light_outputs(simulation, setup.coupled; dates) : DataFrame()
+    return (; leaves, plants, light, simulation, scene=setup.scene, meteo=setup.meteo)
 end
 
 mapping = (
@@ -142,10 +139,13 @@ mapping = (
     Ra_NIR_q=(:absorbed_energy, :total, :nir),
 )
 
-function read_component_values(; csv_path)
-    component_values = CSV.read(csv_path, DataFrame; delim=(';'))
-    sdf = filter(:step_number => ==(1), component_values)
-    values_dict = Dict(Int(i) => Float64(v) for (i, v) in zip(sdf.node_id, sdf.Ri_PAR_f))
+function read_component_values(; csv_path, timestep=1, variable=:Ri_PAR_f)
+    component_values = CSV.read(csv_path, DataFrame)
+    # Current tables and legacy ArchimedLight exports both use actual MTG IDs.
+    step_column = :timestep in propertynames(component_values) ? :timestep : :step_number
+    sdf = filter(step_column => ==(timestep), component_values)
+    values_dict = Dict(Int(i) => Float64(v) for (i, v) in zip(sdf.node_id, sdf[!, variable])
+        if !ismissing(i) && !ismissing(v) && isfinite(v))
 
     return values_dict
 end
