@@ -96,9 +96,12 @@ function _validate_saved_output_table!(table, scene)
     end
     nodes = Dict{Int,typeof(scene.mtg)}()
     plant_ids = Dict{Int,Union{Missing,Int}}()
+    has_plant_instances = :plant_instance_id in propertynames(table)
+    plant_instance_ids = Dict{Int,Union{Missing,Int}}()
     MultiScaleTreeGraph.traverse!(scene.mtg) do node
         nodes[node_id(node)] = node
         _output_plant_node_id(node, plant_ids)
+        has_plant_instances && _output_plant_instance_id(node, plant_instance_ids)
     end
     seen = Set{Tuple{Int,Int}}()
     for row in eachrow(table)
@@ -111,6 +114,7 @@ function _validate_saved_output_table!(table, scene)
         kind = symbol(node) == :LeafSection ?
             (node[:state] == "senescent" ? :senescent_leaf : :active_leaf) : missing
         isequal(row.scale, symbol(node)) && isequal(row.plant_id, plant_ids[id]) &&
+            (!has_plant_instances || isequal(row.plant_instance_id, plant_instance_ids[id])) &&
             isequal(row.kind, kind) || throw(ArgumentError("Saved identity metadata differs for node_id $id."))
     end
     return table
@@ -125,6 +129,8 @@ the current DOE file and RNG. Checks source files, scene geometry, CSV hashes
 and node metadata before returning. No meteorology or simulation is executed.
 Return `scene`, `leaves`, `plants`, `light`, `config`, `day` and `metadata`.
 Use `tables=(:leaves,)` when only that CSV is needed; other tables are empty.
+Earlier format-version-1 tables without `plant_instance_id` remain readable.
+When present, that column is also checked against each node's Plant ancestor.
 """
 function load_day_outputs(; config_id, day, output_dir=_agripv_daily_output_dir(),
     tables=(:leaves, :plants, :light))
@@ -151,6 +157,8 @@ function load_day_outputs(; config_id, day, output_dir=_agripv_daily_output_dir(
     config = ConfigPV(; (Symbol(name) => value for (name, value) in recipe["config"])...)
     scene = agripv_scene(; c=config, day=Date(recipe["day"]),
         plant_density=recipe["plant_density"], ground_res=recipe["ground_res"],
+        ground_nx=get(recipe, "ground_nx", round(Int, recipe["ground_res"] * config.panel_x_distance)),
+        ground_ny=get(recipe, "ground_ny", round(Int, recipe["ground_res"] * config.panel_y_distance)),
         obj_path=source_paths["obj"], mtg_path=source_paths["mtg"],
         plant_rotations=recipe["plant_rotations_rad"])
     agripv_scene_fingerprint(scene) == metadata["scene_sha256"] || throw(ArgumentError(

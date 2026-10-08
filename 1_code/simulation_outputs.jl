@@ -22,7 +22,9 @@ const AGRIPV_LEAF_OUTPUT_COLUMNS = merge((
     λE=(:energy_balance, :λE),
 ), AGRIPV_LIGHT_OUTPUT_COLUMNS)
 
-const AGRIPV_OUTPUT_METADATA = (:node_id, :plant_id, :timestep, :datetime, :object_id, :scale, :kind)
+const AGRIPV_OUTPUT_METADATA = (
+    :node_id, :plant_id, :plant_instance_id, :timestep, :datetime, :object_id, :scale, :kind,
+)
 
 function _output_plant_node_id(node, cache)
     id = MultiScaleTreeGraph.node_id(node)
@@ -34,25 +36,51 @@ function _output_plant_node_id(node, cache)
     return plant_id
 end
 
+function _output_plant_instance_id(node, cache)
+    id = MultiScaleTreeGraph.node_id(node)
+    haskey(cache, id) && return cache[id]
+    if MultiScaleTreeGraph.symbol(node) == :Plant
+        # PlantGeom stores the caller-supplied placement ID here, independently
+        # of the sequential node IDs assigned to each day's growing subtree.
+        instance_id = node[:plantID]
+        if isnothing(instance_id) || ismissing(instance_id)
+            instance_id = missing
+        elseif !(instance_id isa Integer && instance_id > 0)
+            throw(ArgumentError("Plant :plantID must be a positive integer; got $instance_id."))
+        else
+            instance_id = Int(instance_id)
+        end
+    else
+        parent_node = parent(node)
+        instance_id = isnothing(parent_node) ? missing :
+            _output_plant_instance_id(parent_node, cache)
+    end
+    cache[id] = instance_id
+    return instance_id
+end
+
 # Generic Object scenarios have no MTG correspondence. Never label their
 # engine ID as a node ID; MTG-backed scenarios use the public source mapping.
 function _output_node_ids(model, objects)
     node_ids = fill!(Vector{Union{Missing,Int}}(undef, length(objects)), missing)
     plant_ids = copy(node_ids)
-    isempty(objects) && return node_ids, plant_ids
+    plant_instance_ids = copy(node_ids)
+    isempty(objects) && return node_ids, plant_ids, plant_instance_ids
     first_node = try
         PlantSimEngine.source_node(model, first(objects).id)
     catch error
         error isa ArgumentError || rethrow()
-        return node_ids, plant_ids
+        return node_ids, plant_ids, plant_instance_ids
     end
     plant_cache = Dict{Int,Union{Missing,Int}}()
+    instance_cache = Dict{Int,Union{Missing,Int}}()
     for (i, object) in enumerate(objects)
         node = i == 1 ? first_node : PlantSimEngine.source_node(model, object.id)
         node_ids[i] = MultiScaleTreeGraph.node_id(node)
         plant_ids[i] = _output_plant_node_id(node, plant_cache)
+        plant_instance_ids[i] = _output_plant_instance_id(node, instance_cache)
     end
-    return node_ids, plant_ids
+    return node_ids, plant_ids, plant_instance_ids
 end
 
 function leaf_output_requests(; kind=:active_leaf)
@@ -145,7 +173,11 @@ publisher prevents ambiguous A/Gₛ values from iterative photosynthesis calls.
 
 Rows include `node_id`, the actual source MTG node ID, and `plant_id`, the
 nearest Plant ancestor's node ID (the plant itself for Plant rows). These are
-missing for generic Object scenarios without an MTG. `object_id` retains the
+local to each daily scene. `plant_instance_id` is the nearest Plant ancestor's
+`:plantID` attribute, supplied as `id` when placing the plant with PlantGeom.
+It remains stable across dates with the same planting layout and enumeration.
+It is missing for non-plant objects and unannotated Plant nodes; all three IDs
+are missing for generic Object scenarios without an MTG. `object_id` retains the
 engine identity, which need not equal `node_id`; the original OBJ `:Id`
 attribute is not a unique scene identifier. Rows use global `timestep` values. Objects are
 ordered by the public object query and their publication steps are chronological.
@@ -184,7 +216,7 @@ function collect_selected_outputs(
 
     objects = PlantSimEngine.model_objects(model; scale, kind)
     geometry_only && filter!(object -> !isnothing(object.geometry), objects)
-    source_node_ids, source_plant_ids = _output_node_ids(model, objects)
+    source_node_ids, source_plant_ids, source_plant_instance_ids = _output_node_ids(model, objects)
     object_positions = Dict(object.id => index for (index, object) in enumerate(objects))
     streams_by_object = [Any[nothing for _ in sources] for _ in objects]
     value_types = Type[Union{} for _ in sources]
@@ -226,18 +258,21 @@ function collect_selected_outputs(
     kinds_column = Vector{Union{Missing,Symbol}}(undef, nrows)
     node_ids_column = Vector{Union{Missing,Int}}(undef, nrows)
     plant_ids_column = Vector{Union{Missing,Int}}(undef, nrows)
+    plant_instance_ids_column = Vector{Union{Missing,Int}}(undef, nrows)
     output_columns = [fill!(Vector{Union{Missing,T}}(undef, nrows), missing) for T in value_types]
     forcing_dates = _selected_output_dates(dates)
 
     offset = 0
-    for (object, streams, row_count, node_id, plant_id) in
-        zip(objects, streams_by_object, row_counts, source_node_ids, source_plant_ids)
+    for (object, streams, row_count, node_id, plant_id, plant_instance_id) in
+        zip(objects, streams_by_object, row_counts, source_node_ids, source_plant_ids,
+            source_plant_instance_ids)
         row_offset = offset
         _visit_selected_output_rows(streams, (local_row, timestep, positions) -> begin
             row = row_offset + local_row
             object_ids_column[row] = object.id.value
             node_ids_column[row] = node_id
             plant_ids_column[row] = plant_id
+            plant_instance_ids_column[row] = plant_instance_id
             steps_column[row] = timestep
             datetimes_column[row] = _selected_output_datetime(forcing_dates, timestep)
             scales_column[row] = isnothing(object.scale) ? missing : object.scale
@@ -256,6 +291,7 @@ function collect_selected_outputs(
     table = DataFrame(
         node_id=node_ids_column,
         plant_id=plant_ids_column,
+        plant_instance_id=plant_instance_ids_column,
         timestep=steps_column,
         datetime=datetimes_column,
         object_id=object_ids_column,

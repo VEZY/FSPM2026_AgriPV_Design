@@ -93,10 +93,10 @@ const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow p
             forcing = get_meteo(days)
             @test all(day -> count(row -> Date(row.date) == day, forcing) == 24, days)
             config_id = 7302
-            # One plant and four ground cells bound the raster workload while keeping
-            # generated changing geometry and all 24 hourly coupled solves per date.
+            # Two plants make the second Plant node shift when the first plant
+            # gains an organ, while a coarse ground grid bounds the raster workload.
             config = ConfigPV(; panel_length=1.0, panel_width=1.0,
-                panel_height=2.0, panel_x_distance=1.0, panel_y_distance=2.0)
+                panel_height=2.0, panel_x_distance=2.0, panel_y_distance=2.0)
             scene_kwargs = (; plant_density=1.0, ground_res=2)
 
             @test_throws ArgumentError prepare_day_simulation(;
@@ -118,16 +118,38 @@ const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow p
                     @test nrow(table) == getproperty(result.rows, role)
                     assert_daily_rows(table, days, forcing; config_id)
                 end
-                @test nrow(tables.plants) == 48
-                @test nrow(tables.leaves) == 48
+                @test nrow(tables.plants) == 96
+                @test nrow(tables.leaves) == 96
                 @test count(==(last(days)), tables.light.day) ==
-                    count(==(first(days)), tables.light.day) + 24
+                    count(==(first(days)), tables.light.day) + 48
                 @test count(row -> row.day == last(days) && isequal(row.kind, "senescent_leaf"),
-                    eachrow(tables.light)) == 24
+                    eachrow(tables.light)) == 48
                 @test all(isfinite, tables.leaves.A)
                 @test all(isfinite, tables.light.Ri_PAR_f)
                 @test all(isfinite, tables.plants.assimilation_step)
                 @test all(isfinite, tables.plants.transpiration_step)
+
+                # Planting identities survive regenerated daily scenes, whereas
+                # node IDs retain their existing meaning within each scene.
+                daily_plant_ids = Dict{Date,Dict{Int,Int}}()
+                for day in days
+                    daily = filter(:day => ==(day), tables.plants)
+                    daily_plant_ids[day] = Dict(zip(daily.plant_instance_id, daily.plant_id))
+                end
+                @test all(ids -> Set(keys(ids)) == Set([2, 3]), values(daily_plant_ids))
+                @test daily_plant_ids[first(days)][3] != daily_plant_ids[last(days)][3]
+                @test tables.plants.node_id == tables.plants.plant_id
+                for role in (:leaves, :light)
+                    for row in eachrow(getproperty(tables, role))
+                        if ismissing(row.plant_id)
+                            @test ismissing(row.plant_instance_id)
+                        else
+                            @test row.plant_id == daily_plant_ids[row.day][row.plant_instance_id]
+                        end
+                    end
+                end
+                @test Set(tables.leaves.plant_instance_id) == Set([2, 3])
+                @test any(ismissing, tables.light.plant_instance_id)
 
                 for daily_plant in groupby(tables.plants, [:day, :plant_id])
                     ordered = sort(DataFrame(daily_plant), :timestep)
@@ -144,12 +166,13 @@ const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow p
                 @test metadata["config_id"] == config_id
                 @test metadata["days"] == string.(days)
                 @test metadata["identity_scope"] == "day"
+                @test metadata["plant_instance_identity_scope"] == "configuration"
                 @test metadata["cumulative_scope"] == "day"
                 @test length(metadata["scenes"]) == 2
                 recipes = getindex.(metadata["scenes"], "scene")
                 @test getindex.(recipes, "day") == string.(days)
                 @test first(recipes)["plant_rotations_rad"] == last(recipes)["plant_rotations_rad"]
-                @test length(first(recipes)["plant_rotations_rad"]) == 1
+                @test length(first(recipes)["plant_rotations_rad"]) == 2
                 @test first(metadata["scenes"])["scene_sha256"] != last(metadata["scenes"])["scene_sha256"]
                 for (day, recipe) in zip(days, recipes)
                     @test recipe["config"] == Dict(string(name) => getproperty(config, name)
@@ -204,7 +227,7 @@ const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow p
                 @test summary.paths.light === nothing
                 @test summary.rows.leaves == 0
                 @test summary.rows.light == 0
-                @test summary.rows.plants == 1
+                @test summary.rows.plants == 2
                 @test isfile(summary.paths.plants)
                 @test !isfile(result.paths.leaves)
                 @test !isfile(result.paths.light)

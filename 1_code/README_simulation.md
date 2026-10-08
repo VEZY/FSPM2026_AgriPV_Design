@@ -22,7 +22,12 @@ summaries. These are wide tables: one row per object and publication timestep.
 It also writes `scene_config_ID_DATE.toml` alongside them for scene reconstruction.
 All three include `node_id`, the exact node ID in the returned scene MTG,
 and `plant_id`, its nearest Plant ancestor's node ID. A Plant row uses its
-own ID as `plant_id`; ground and panels have no plant ID. `object_id` retains
+own node ID as `plant_id`. `plant_instance_id` is the Plant ancestor's `:plantID`
+placement attribute, set by `add_plant!(...; id=...)`, and identifies the same
+planting position when scenes are rebuilt with a fixed layout. Ground and
+panels have no plant IDs. `plant_instance_id` is also `missing` for an MTG
+whose Plant ancestor has no placement ID; all MTG identity columns are
+`missing` for generic Object scenarios. `object_id` retains
 the PlantSimEngine identity, which can differ from `node_id`. Neither refers
 to an object's position in an array or to the original OBJ `:Id` attribute,
 which can repeat between plants. `datetime` comes from the forcing.
@@ -77,9 +82,17 @@ CSV columns match the daily tables, with added `day` and `config_id`. Each
 `datetime` is the actual forcing timestamp. `timestep` starts at 1 each day;
 `node_id`, `plant_id` and `object_id` refer to that day's scene and must be used
 together with `day`. Changing plant topology can change these IDs across days.
+Use `(config_id, plant_instance_id)` to follow a planted individual across
+days, and `(config_id, day, node_id)` to locate an exact daily scene node.
+`plant_instance_id` stays fixed because it comes from the plant's placement ID,
+independently of its changing organ count. This requires a fixed planting layout
+and plant enumeration within each configuration; it does not identify the same
+plant across different configurations. The TOML records
+`plant_instance_identity_scope = "configuration"`, alongside the existing
+`identity_scope = "day"` for scene node identities.
 The plant `assimilation_cumulative` and `transpiration_cumulative` columns are
 **within-day** cumuls, reset at each new daily simulation. Use the step amounts
-and an explicit plant correspondence to compute period totals. This workflow
+grouped by `(config_id, plant_instance_id)` to compute period totals. This workflow
 uses supplied growth geometry; it does not feed assimilation back into growth.
 
 Exports are built in a temporary directory and replace the configuration's
@@ -195,6 +208,9 @@ is used even if the DOE CSV has since changed. Source-file hashes, node metadata
 world-space scene geometry and CSV hashes must match. Keep the TOML and CSVs
 together; source paths are relative to this project, so the project can move.
 The original OBJ/MTG inputs must remain available and unchanged.
+Earlier exports with a TOML recipe remain readable when their tables have no
+`plant_instance_id` column. New exports include that column, and the loader
+checks it against the rebuilt scene's Plant placement IDs.
 
 For plotting, execute with `mt=true`:
 

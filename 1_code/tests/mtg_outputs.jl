@@ -13,16 +13,18 @@ export MTG_OUTPUT_TEST_RESULT
 # output conversions and attachment, without adding a physiological model.
 const OT = AgripvOutputTests
 
-function mtg_output_fixture()
-    attrs(; geometry=nothing, kind=nothing) = Dict{Symbol,Any}(
-        :Id => 7, :geometry => geometry, :kind => kind,
+function mtg_output_fixture(; plant_ids=true)
+    attrs(; geometry=nothing, kind=nothing, plantID=nothing) = Dict{Symbol,Any}(
+        :Id => 7, :geometry => geometry, :kind => kind, :plantID => plantID,
     )
     mtg = Node(11, NodeMTG("/", :Scene, 1, 0), attrs())
-    plant_a = Node(23, mtg, NodeMTG("+", :Plant, 1, 1), attrs())
+    plant_a = Node(23, mtg, NodeMTG("+", :Plant, 1, 1),
+        attrs(; plantID=plant_ids ? 1 : nothing))
     stem = Node(29, plant_a, NodeMTG("/", :Stem, 1, 2), attrs())
     leaf_a = Node(47, stem, NodeMTG("+", :LeafSection, 1, 3),
         attrs(; geometry=:prescribed_mesh, kind=:active_leaf))
-    plant_b = Node(101, mtg, NodeMTG("+", :Plant, 2, 1), attrs())
+    plant_b = Node(101, mtg, NodeMTG("+", :Plant, 2, 1),
+        attrs(; plantID=plant_ids ? 2 : nothing))
     leaf_b = Node(203, plant_b, NodeMTG("/", :LeafSection, 1, 2),
         attrs(; geometry=:prescribed_mesh, kind=:active_leaf))
     senescent = Node(257, plant_b, NodeMTG("+", :LeafSection, 2, 2),
@@ -84,14 +86,24 @@ const MTG_OUTPUT_TEST_RESULT = @testset "Wide MTG outputs and scalar visualizati
         @test f.leaves.node_id == [47, 47, 203, 203]
         @test f.leaves.object_id == [:engine_47, :engine_47, :engine_203, :engine_203]
         @test f.leaves.plant_id == [23, 23, 101, 101]
+        @test f.leaves.plant_instance_id == [1, 1, 2, 2]
+        @test eltype(f.leaves.plant_instance_id) == Union{Missing,Int}
         @test f.leaves.timestep == [1, 2, 1, 2]
         @test f.leaves.datetime == repeat(f.dates; outer=2)
         @test all(==(:active_leaf), f.leaves.kind)
         @test Set(f.light.node_id) == Set([47, 203, 257, 509])
         @test all(ismissing, f.light.plant_id[findall(id -> isequal(id, 509), f.light.node_id)])
+        @test all(ismissing, f.light.plant_instance_id[findall(id -> isequal(id, 509), f.light.node_id)])
         @test all(==(101), f.light.plant_id[findall(id -> isequal(id, 257), f.light.node_id)])
+        @test all(==(2), f.light.plant_instance_id[findall(id -> isequal(id, 257), f.light.node_id)])
         @test Set(f.plants.node_id) == Set([23, 101])
         @test f.plants.plant_id == f.plants.node_id
+        @test Dict(zip(f.plants.node_id, f.plants.plant_instance_id)) == Dict(23 => 1, 101 => 2)
+        for row in eachrow(f.leaves)
+            matching_light = filter(light_row -> light_row.node_id == row.node_id &&
+                light_row.timestep == row.timestep, f.light)
+            @test only(matching_light.plant_instance_id) == row.plant_instance_id
+        end
         @test f.leaf_a[:Id] == f.leaf_b[:Id] == 7
         @test source_node(f.model, :engine_47) === f.leaf_a
         @test source_node(f.model, :engine_203) === f.leaf_b
@@ -112,6 +124,19 @@ const MTG_OUTPUT_TEST_RESULT = @testset "Wide MTG outputs and scalar visualizati
         generic_table = OT.collect_leaf_outputs(generic.simulation, generic.model)
         @test all(ismissing, generic_table.node_id)
         @test all(ismissing, generic_table.plant_id)
+        @test all(ismissing, generic_table.plant_instance_id)
+
+        # Unannotated MTGs still expose their daily node identity but cannot
+        # acquire a persistent planting identity from a node ID or OBJ Id.
+        unannotated = mtg_output_fixture(; plant_ids=false)
+        @test all(ismissing, unannotated.leaves.plant_instance_id)
+        @test all(ismissing, unannotated.plants.plant_instance_id)
+        @test all(ismissing, unannotated.light.plant_instance_id)
+        @test unannotated.leaves.plant_id == [23, 23, 101, 101]
+        for invalid_id in (0, "plant_1")
+            f.plant_a[:plantID] = invalid_id
+            @test_throws ArgumentError OT.collect_leaf_outputs(f.simulation, f.model)
+        end
     end
 
     @testset "Surface, latent heat, signed exchanges and actual durations" begin
@@ -157,6 +182,7 @@ const MTG_OUTPUT_TEST_RESULT = @testset "Wide MTG outputs and scalar visualizati
             node[:Ri_PAR_f] = -999.0
             node[:unrelated] = :preserved
             node[:timestep] = :metadata_preserved
+            node[:plant_instance_id] = :metadata_preserved
         end
         @test OT.attach_outputs!(f.mtg, f.leaves; timestep=1) === f.mtg
         @test f.leaf_a[:A] == 10f0
@@ -165,6 +191,7 @@ const MTG_OUTPUT_TEST_RESULT = @testset "Wide MTG outputs and scalar visualizati
         @test all(id -> isnothing(nodes[id][:A]), (11, 23, 29, 101, 257, 509))
         @test all(node -> node[:unrelated] == :preserved, values(nodes))
         @test all(node -> node[:timestep] == :metadata_preserved, values(nodes))
+        @test all(node -> node[:plant_instance_id] == :metadata_preserved, values(nodes))
 
         OT.attach_outputs!(f.mtg, f.leaves; timestep=2, variables=[:A])
         @test f.leaf_a[:A] == 12f0
@@ -185,6 +212,7 @@ const MTG_OUTPUT_TEST_RESULT = @testset "Wide MTG outputs and scalar visualizati
         @test f.plant_a[:plant_value] == 2
         @test f.plant_b[:plant_value] == 2
         @test isnothing(f.leaf_a[:plant_value])
+        @test all(node -> node[:plant_instance_id] == :metadata_preserved, values(nodes))
 
         # Leaf and plant tables share flux names. Preserve both node scales
         # explicitly when assembling several tables on the same MTG.
@@ -229,6 +257,7 @@ const MTG_OUTPUT_TEST_RESULT = @testset "Wide MTG outputs and scalar visualizati
             (table=f.leaves, timestep=99, variables=[:A]),
             (table=f.leaves, timestep=1, variables=Symbol[]),
             (table=f.leaves, timestep=1, variables=[:node_id]),
+            (table=f.leaves, timestep=1, variables=[:plant_instance_id]),
             (table=f.leaves, timestep=1, variables=[:unretained]),
             (table=unknown, timestep=1, variables=[:A, :Ra_PAR_f]),
             (table=missing_id, timestep=1, variables=[:A, :Ra_PAR_f]),

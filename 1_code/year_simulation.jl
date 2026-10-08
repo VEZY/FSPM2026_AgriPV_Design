@@ -48,6 +48,8 @@ plant rotations are reused throughout the period.
 
 Rows keep the daily schema and add `day` and `config_id`. Node identities and
 `timestep` are local to each day; plant cumulative quantities reset daily.
+`plant_instance_id` tracks the same planting position across days within this
+configuration, provided the planting layout stays fixed.
 The TOML sidecar stores each scene recipe and fingerprint. Files are published
 after all daily simulations succeed; a simulation failure preserves prior outputs.
 Return output paths, simulated dates and row counts, rather than all tables.
@@ -129,6 +131,7 @@ function year_simulation(; pvconfig, config_id,
             "format_version" => 1, "simulation" => "growth_period",
             "config_id" => config_id, "days" => string.(dates),
             "identity_scope" => "day", "cumulative_scope" => "day",
+            "plant_instance_identity_scope" => "configuration",
             "scenes" => scenes, "tables" => tables,
         )
         open(joinpath(staging, filenames.metadata), "w") do io
