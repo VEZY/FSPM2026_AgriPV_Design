@@ -9,7 +9,7 @@ include("pvconfig.jl")
 include("scene.jl")
 
 models = agripv_models()
-configIDs = range(0, 0)
+configIDs = range(0, 3)
 
 # sky = SkyState(
 #     135.0,  # sun azimuth in degrees

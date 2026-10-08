@@ -70,22 +70,23 @@ begin
     ax = Axis3(
         f[1, 1],
         aspect=:data,
-        # title="Config $configID",
+        title="Config $configID",
         xlabel="x (m)",
         ylabel="y (m)",
         zlabel="z (m)",
-        xspinesvisible=false,
-        yspinesvisible=false,
-        zspinesvisible=false
+        # xspinesvisible=false,
+        # yspinesvisible=false,
+        # zspinesvisible=false
     )
 
     plantviz!(ax, scene.mtg; color=:color)
-    ax.azimuth[]=deg2rad(45)
+    ax.azimuth[]=deg2rad(-135)
     ax.elevation[]=deg2rad(30)
-    hidedecorations!(ax)
+    # hidedecorations!(ax)
     f
 end
-save("2_outputs/config_$(configID)_nospines.png", alpha_colorbuffer(f), dpi=300)
+# save("2_outputs/config_$(configID)_nospines.png", alpha_colorbuffer(f), dpi=300)
+save("2_outputs/config_$(configID).png", alpha_colorbuffer(f), dpi=300)
 # save("2_outputs/config_$(configID)_noaxis.png", background=false)
 # save("2_outputs/config_$(configID).png", alpha_colorbuffer(f), update=false, px_per_unit=3.0)
 
