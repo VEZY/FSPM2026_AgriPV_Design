@@ -48,6 +48,126 @@ snapshot for the supplied 2025-07-02 forcing. The ID belongs to
 copy preserving its node IDs), or rebuild it from the saved scene recipe as below.
 A raw crop template is a different tree.
 
+## Simulate the growing period
+
+Run `4.3_run_year_simulation.jl` through Kaimon from the project root. It uses
+the same hourly ArchimedLight and PlantBiophysics coupling as the daily script
+for configurations 0–3. The plant OBJ filenames in `2_outputs/archicrop/`
+define the dates: each must end in `YYYY-MM-DD.obj` and have a matching `.mtg`.
+The driver selects `wheat_*.obj`; adjust `plant_dir` and `plant_pattern` for
+another crop series. Dates are sorted chronologically; gaps are not filled.
+Missing MTGs, duplicate plant dates or missing climate dates raise an error.
+The current input series covers 121 days, 2025-03-04 through 2025-07-02.
+
+The climate file is read once for all configurations. For each date the runner
+builds a fresh scene with that day's growing plant maquette and the supplied
+PV configuration, prepares that day's forcing, and runs the complete daily
+coupling. Plant placements and rotations remain fixed across the period within
+each configuration. The plant geometry changes with the maquettes.
+
+Results are appended daily, keeping only a single day's simulation and tables
+in memory. In `2_outputs/simulations/yearly/`, each configuration produces:
+
+- `out_config_ID.csv`: active leaf sections across all simulated days;
+- `plants_config_ID.csv`: plant summaries across all simulated days;
+- `light_config_ID.csv`: radiation on all geometric objects across all days;
+- `scene_config_ID.toml`: dates, per-day scene recipes and fingerprints, and CSV hashes.
+
+CSV columns match the daily tables, with added `day` and `config_id`. Each
+`datetime` is the actual forcing timestamp. `timestep` starts at 1 each day;
+`node_id`, `plant_id` and `object_id` refer to that day's scene and must be used
+together with `day`. Changing plant topology can change these IDs across days.
+The plant `assimilation_cumulative` and `transpiration_cumulative` columns are
+**within-day** cumuls, reset at each new daily simulation. Use the step amounts
+and an explicit plant correspondence to compute period totals. This workflow
+uses supplied growth geometry; it does not feed assimilation back into growth.
+
+Exports are built in a temporary directory and replace the configuration's
+output files only after all selected dates succeed. A simulation failure leaves
+previous completed outputs intact. The period TOML contains one recipe per
+date; `load_day_outputs` remains the loader for daily exports.
+
+For a short run or plant summaries alone:
+
+```julia
+include("1_code/year_simulation.jl")
+summary = year_simulation(pvconfig=get_pvconfig(0), config_id=0,
+    plant_pattern="wheat_*.obj", days=[Date(2025, 3, 4), Date(2025, 7, 2)],
+    keep_leaves=false, keep_light=false,
+    output_dir="2_outputs/simulations/period_check")
+summary.paths
+summary.rows
+```
+
+Omit `days` to simulate every available maquette date. Pass `scene_kwargs` as
+in `day_simulation` for a smaller scene during verification. A supplied `meteo`
+table lets several configurations reuse already-read forcing; the runner
+checks coverage and selects each day's rows before calling `day_simulation`.
+
+## Plot yearly faPAR without loading the light CSVs
+
+Run `5.6_plot_year_fapar.jl` through Kaimon with `mt=true` for GLMakie. It
+processes configurations 0–3 and writes
+`2_outputs/fapar/faPAR_over_time_plants_panels_ground.png`, with one panel per
+configuration and daily curves for plants, solar panels, ground and their sum.
+The horizontal reference at one helps inspect the radiation balance.
+
+`year_fapar.jl` reads each light CSV sequentially in **32 MiB input batches**,
+parses only eight necessary columns, and retains totals per timestamp. It
+never reads or memory maps the entire light file. Parsed columns and Julia's
+runtime require additional memory; memory use is independent of the full CSV
+size. Source SHA256 and row count are checked against the simulation sidecar
+during the same pass, without a second scan.
+
+For category `g`, absorbed energy is
+`sum(Ra_PAR_f * area * duration_s)` over its geometric objects and timesteps.
+Plants include all objects with `plant_id`, including stems and senescent leaf
+sections. The other categories are `Panel` and `Cobblestone`. There is no extra
+factor of two for leaf faces. Incoming energy is sky `Ri_PAR_f * duration_s *
+horizontal_scene_area`, where the area comes from the saved PV configuration.
+The light table's object-level `Ri_PAR_f` includes intercepted/scattered light
+and is not the denominator.
+
+Daily fractions divide summed absorbed energy by summed incoming energy;
+they are not an unweighted mean of hourly ratios. Nighttime hourly fractions
+are `missing`. No fraction is clipped or renormalized. The total can be below
+one because some scattered PAR escapes upward, with raster/scattering
+tolerances also contributing. `nonabsorbed_fraction = 1 - fapar_total` records
+that difference; it is not an independently measured reflected-energy budget.
+
+Small `fapar_hourly_config_ID.csv` and `fapar_daily_config_ID.csv` tables retain
+energies in joules and fractions, and `fapar_info_config_ID.toml` records the
+source hash. Sky forcing is reconstructed with the same `archimed_meteo` path
+as the simulation, assuming the climate file and preparation code have not
+changed. To use an archived run's exact prepared forcing, supply its table
+explicitly:
+
+```julia
+include("1_code/year_fapar.jl")
+summary = summarize_year_fapar(config_id=0, forcing=original_prepared_meteo)
+```
+
+The forcing must have `date`, `duration` and sky `Ri_PAR_f` columns and cover
+exactly the light run's timestamps. To redraw the figure without rescanning
+the large files:
+
+```julia
+using CSV, DataFrames, Dates
+include("1_code/year_fapar_plot.jl") # mt=true
+daily = vcat([CSV.read("2_outputs/fapar/fapar_daily_config_$(id).csv", DataFrame;
+    types=Dict(:day => Date))
+    for id in 0:3]...)
+plot_year_fapar(daily;
+    output_path="2_outputs/fapar/faPAR_over_time_plants_panels_ground.png")
+```
+
+On 2026-10-08 all four production light files were processed and their source
+hashes verified: 298,143,168 rows, 121 dates per configuration, 11,616 hourly
+and 484 daily summaries. Daily total faPAR ranged from 0.9212 to 0.9468.
+The 51 focused tests passed through Kaimon with Julia 1.13.1, CSV 1.1.0 and
+ArchimedLight 0.2.0. They check area/duration integration, energy weighting,
+plant categories, missing dark ratios, batch equivalence and invalid inputs.
+
 ## Reload CSVs and rebuild their scene
 
 The daily loop calls `write_day_outputs(result; config_id=configID)`. This keeps
@@ -224,6 +344,24 @@ nighttime respiration or stomatal parameters against measurements.
 Structural checks do not establish predictive accuracy.
 
 ## Validation and performance
+
+On 2026-10-07 the growth-period runner completed all 121 actual maquette dates
+on a reduced configuration-0 scene (`plant_density=1.0`, `ground_res=2`), with
+24 hourly steps per day and plant summaries retained: 2,904 coupled steps and
+11,616 plant rows. CSV date coverage, hashes and fixed rotations were checked.
+A separate two-day run using the first and last actual maquettes retained all
+three tables and wrote 4,608 leaf, 13,968 light and 192 plant rows. These are
+integration checks on small scenes; the four complete production scenes over
+the full period were not run. Artifacts are in
+`2_outputs/validation/2026-10-07-growth-period/` and
+`2_outputs/validation/2026-10-07-growth-period-all-days/`.
+
+The period regression tests generate their own dated OBJ/MTG pairs and use
+the tracked climate file, so they do not require ignored ArchiCrop outputs.
+They cover changing active/senescent geometry, two full days, chronological
+exports, daily cumulative resets, missing inputs, selective retention and
+preserving previous exports when a later day's simulation fails.
+The complete project regression suite passed 1,170 checks through Kaimon.
 
 On 2026-10-07, the complete PlantBiophysics package suite passed 2,086 checks
 through Kaimon's dedicated test runner with Julia 1.13.1, including 1,495 FvCB

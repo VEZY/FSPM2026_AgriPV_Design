@@ -10,7 +10,12 @@ using .AgripvPlantBalance
 include("simulation_outputs.jl")
 
 """Build the scene and coupled models without running or materializing outputs."""
-function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple())
+function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), meteo=nothing)
+    meteo = isnothing(meteo) ? get_meteo(day) : meteo
+    isempty(meteo) && throw(ArgumentError("No meteorology for $day"))
+    all(row -> Date(row.date) == day, meteo) || throw(ArgumentError(
+        "Daily meteorology must contain only $day.",
+    ))
     scene = agripv_scene(; c=pvconfig, day, scene_kwargs...)
     options = LightOptions(
         turtle_sectors=46,
@@ -22,8 +27,7 @@ function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple())
         include_sky_fraction=true,
         scene_rotation_deg=pvconfig.panel_orientation,
     )
-    meteo = archimed_meteo(get_meteo(day), options)
-    isempty(meteo) && throw(ArgumentError("No meteorology for $day"))
+    meteo = archimed_meteo(meteo, options)
     light_sim = LightSimulation(scene, agripv_models(); options)
 
     # Output coverage follows actual geometry, including stems, panels and ground.
@@ -89,7 +93,7 @@ function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple())
 end
 
 """
-    day_simulation(; pvconfig, day, keep_leaves=true, keep_light=true, scene_kwargs=())
+    day_simulation(; pvconfig, day, keep_leaves=true, keep_light=true, scene_kwargs=(), meteo=nothing)
 
 Run hourly radiation on all geometry and physiology on active leaf sections.
 Return wide `leaves`, `light` and `plants` DataFrames, plus the simulation,
@@ -100,10 +104,12 @@ Keep `scene.mtg` to reassociate exported values with its LeafSection nodes.
 Plant quantities are surface weighted and integrate
 actual step durations. Set `keep_leaves=false, keep_light=false` for plant
 summaries alone. No global long-table sort or automatic resampling is needed.
+Supply `meteo` to reuse already-read forcing for this date; otherwise the
+climate file is read by `get_meteo(day)`.
 """
 function day_simulation(; pvconfig, day, keep_leaves=true, keep_light=true,
-    scene_kwargs=NamedTuple())
-    setup = prepare_day_simulation(; pvconfig, day, scene_kwargs)
+    scene_kwargs=NamedTuple(), meteo=nothing)
+    setup = prepare_day_simulation(; pvconfig, day, scene_kwargs, meteo)
     requests = plant_output_requests()
     if keep_leaves
         append!(requests, leaf_output_requests())
