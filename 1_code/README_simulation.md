@@ -76,6 +76,9 @@ PV configuration, prepares that day's forcing, and runs the complete daily
 coupling. Plant placements and rotations remain fixed across the period within
 each configuration. The plant geometry changes with the maquettes.
 
+Solar geometry uses the latitude in the weather metadata: **43.61° N** for
+Montpellier. Sky preparation retains this metadata when computing sun angles.
+
 The yearly runner calls `day_simulation` directly: both paths therefore share
 the light options in `prepare_day_simulation` (46 turtle sectors, 0.01 m pixels,
 toricity, scattering, radiation caching, direct light distributed into turtle
@@ -87,7 +90,8 @@ compare standalone daily results against both dates of a reduced yearly run
 with these rotations and the same weather, density and geometry sources.
 
 Existing output files retain their original scene settings. Rerun simulations
-after changing the density, then recompute yearly faPAR from the new outputs.
+after changing the density or solar geometry, then recompute yearly faPAR from
+the new outputs.
 Compare the saved recipes' `plant_density` values before comparing daily and
 yearly results generated at different times.
 

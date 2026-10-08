@@ -1,4 +1,5 @@
 # Execute via Kaimon in the coutellier_agripv project.
+include("meteo.jl")
 include("plant_balance.jl")
 include("simulation_outputs.jl")
 include("mtg_outputs.jl")
