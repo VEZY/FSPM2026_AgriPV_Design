@@ -21,8 +21,6 @@ df_mean = @chain df begin
     @combine :assimilation_step_mean = mean(coalesce.(:assimilation_step, 0.0))
 end
 
-f = Figure(size=(900, 700))#, title="Absorbed PAR for each config over a day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)")
-
 # ax = Axis(f[1, 1], title="Config")
 # for configID in configIDs
 #     row = 1 + (configID) ÷ 2
@@ -41,24 +39,34 @@ f = Figure(size=(900, 700))#, title="Absorbed PAR for each config over a day", x
 
 #     draw!(ax, aPPFD)
 # end
-    
-aPPFD =
-    data(df) *
-    mapping(
-        :datetime => (x -> DateTime(x)) => "Time",
-        :assimilation_step => "Assimilation per step per plant (μmol plant⁻¹ hour⁻¹)",
-        group = :plant_id,
-        layout = :configID
-    ) *
-    visual(Lines, alpha=0.05) +
 
-    data(df_mean) *
-    mapping(
-        :datetime => (x -> DateTime(x)) => "Time",
-        :assimilation_step_mean => "Assimilation per step per plant (μmol plant⁻¹ hour⁻¹)",
-        layout = :configID
-    ) *
-    visual(Lines, color=:red, linewidth=2)
+begin
+    figure_options = (;
+        size=(900, 700),
+        title = "Assimilation per plant per step for each config over a day",
+        subtitle = """
+            For the day July 2, 2025, with a plant density of 60 plants m⁻².""",
+    )
 
-draw!(f, aPPFD)
-save("2_outputs/day_step_assimilation_per_config.png", f, update=false, px_per_unit=3.0)
+    aPPFD =
+        data(df) *
+        mapping(
+            :datetime => (x -> DateTime(x)) => "Time",
+            :assimilation_step => "Assimilation per plant per step (μmol plant⁻¹ hour⁻¹)",
+            group = :plant_id,
+            layout = :configID => (x -> "Config " * string(x))
+        ) *
+        visual(Lines, alpha=0.05, color=:black, label = "Individual plants", legend = (; alpha=0.5, linewidth = 1)) +
+
+        data(df_mean) *
+        mapping(
+            :datetime => (x -> DateTime(x)) => "Time",
+            :assimilation_step_mean => "Assimilation per plant per step (μmol plant⁻¹ hour⁻¹)",
+            layout = :configID => (x -> "Config " * string(x))
+        ) *
+        visual(Lines, color=:red, linewidth=2, label = "Mean", legend = (; linewidth = 2))
+
+    fig = draw(aPPFD; figure = figure_options)
+end
+
+save("2_outputs/day_step_assimilation_per_config.png", fig, update=false, px_per_unit=3.0)

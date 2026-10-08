@@ -68,7 +68,7 @@ traverse!(scene.mtg) do node
 end
 
 begin
-    f = Figure(size=(1800, 1400), backgroundcolor=(:white, 0.01))
+    f = Figure(size=(1800, 1400), backgroundcolor=(:white, 0.01), fontsize=32)
     azimuth_offset = 45 # With azimuth_offset=45, the South is at the bottom right and the West is at the bottom left of the figure.
     ax = Axis3(
         f[1, 1],
