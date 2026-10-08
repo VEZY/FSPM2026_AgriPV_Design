@@ -104,6 +104,70 @@ in `day_simulation` for a smaller scene during verification. A supplied `meteo`
 table lets several configurations reuse already-read forcing; the runner
 checks coverage and selects each day's rows before calling `day_simulation`.
 
+## Plot yearly faPAR without loading the light CSVs
+
+Run `5.6_plot_year_fapar.jl` through Kaimon with `mt=true` for GLMakie. It
+processes configurations 0–3 and writes
+`2_outputs/fapar/faPAR_over_time_plants_panels_ground.png`, with one panel per
+configuration and daily curves for plants, solar panels, ground and their sum.
+The horizontal reference at one helps inspect the radiation balance.
+
+`year_fapar.jl` reads each light CSV sequentially in **32 MiB input batches**,
+parses only eight necessary columns, and retains totals per timestamp. It
+never reads or memory maps the entire light file. Parsed columns and Julia's
+runtime require additional memory; memory use is independent of the full CSV
+size. Source SHA256 and row count are checked against the simulation sidecar
+during the same pass, without a second scan.
+
+For category `g`, absorbed energy is
+`sum(Ra_PAR_f * area * duration_s)` over its geometric objects and timesteps.
+Plants include all objects with `plant_id`, including stems and senescent leaf
+sections. The other categories are `Panel` and `Cobblestone`. There is no extra
+factor of two for leaf faces. Incoming energy is sky `Ri_PAR_f * duration_s *
+horizontal_scene_area`, where the area comes from the saved PV configuration.
+The light table's object-level `Ri_PAR_f` includes intercepted/scattered light
+and is not the denominator.
+
+Daily fractions divide summed absorbed energy by summed incoming energy;
+they are not an unweighted mean of hourly ratios. Nighttime hourly fractions
+are `missing`. No fraction is clipped or renormalized. The total can be below
+one because some scattered PAR escapes upward, with raster/scattering
+tolerances also contributing. `nonabsorbed_fraction = 1 - fapar_total` records
+that difference; it is not an independently measured reflected-energy budget.
+
+Small `fapar_hourly_config_ID.csv` and `fapar_daily_config_ID.csv` tables retain
+energies in joules and fractions, and `fapar_info_config_ID.toml` records the
+source hash. Sky forcing is reconstructed with the same `archimed_meteo` path
+as the simulation, assuming the climate file and preparation code have not
+changed. To use an archived run's exact prepared forcing, supply its table
+explicitly:
+
+```julia
+include("1_code/year_fapar.jl")
+summary = summarize_year_fapar(config_id=0, forcing=original_prepared_meteo)
+```
+
+The forcing must have `date`, `duration` and sky `Ri_PAR_f` columns and cover
+exactly the light run's timestamps. To redraw the figure without rescanning
+the large files:
+
+```julia
+using CSV, DataFrames, Dates
+include("1_code/year_fapar_plot.jl") # mt=true
+daily = vcat([CSV.read("2_outputs/fapar/fapar_daily_config_$(id).csv", DataFrame;
+    types=Dict(:day => Date))
+    for id in 0:3]...)
+plot_year_fapar(daily;
+    output_path="2_outputs/fapar/faPAR_over_time_plants_panels_ground.png")
+```
+
+On 2026-10-08 all four production light files were processed and their source
+hashes verified: 298,143,168 rows, 121 dates per configuration, 11,616 hourly
+and 484 daily summaries. Daily total faPAR ranged from 0.9212 to 0.9468.
+The 51 focused tests passed through Kaimon with Julia 1.13.1, CSV 1.1.0 and
+ArchimedLight 0.2.0. They check area/duration integration, energy weighting,
+plant categories, missing dark ratios, batch equivalence and invalid inputs.
+
 ## Reload CSVs and rebuild their scene
 
 The daily loop calls `write_day_outputs(result; config_id=configID)`. This keeps
