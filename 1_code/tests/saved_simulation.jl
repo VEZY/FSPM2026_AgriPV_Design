@@ -96,7 +96,7 @@ function with_saved_fixture(f)
         tables = prescribed_saved_tables(scene, day)
         result = (; scene, tables...)
         output_dir = joinpath(directory, "saved")
-        paths = write_day_outputs(result; config_id, output_dir)
+        paths = write_day_outputs(result; compact_light=false, config_id, output_dir)
         return f((; scene, result, config, config_id, day, paths,
             output_dir, obj_path, mtg_path))
     end
@@ -288,6 +288,22 @@ const SAVED_SIMULATION_TEST_RESULT = @testset "Saved daily outputs reconstruct t
             end)
         end
     end
+    @testset "Compact gzip light export reloads the same absorbed PAR and identities" begin
+        with_saved_fixture() do f
+            paths = write_day_outputs(f.result; config_id=f.config_id, output_dir=f.output_dir)
+            @test endswith(paths.light, ".csv.gz")
+            stored = _agripv_open_light(paths.light) do io
+                CSV.read(io, DataFrame)
+            end
+            @test propertynames(stored) == AGRIPV_LIGHT_EXPORT_COLUMNS
+            loaded = load_day_outputs(; f.config_id, f.day, f.output_dir)
+            expected = DataFrames.select(f.result.light, [AGRIPV_LIGHT_EXPORT_COLUMNS; :timestep])
+            @test isequal(loaded.light, expected)
+            @test isequal(loaded.leaves, f.result.leaves)
+            @test isequal(loaded.plants, f.result.plants)
+        end
+    end
+
 end
 
 end # module AgripvSavedSimulationTests

@@ -10,7 +10,8 @@ using .AgripvPlantBalance
 include("simulation_outputs.jl")
 
 """Build the scene and coupled models without running or materializing outputs."""
-function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), meteo=nothing)
+function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), meteo=nothing,
+    light_cache_memory_limit_bytes=2 * 1024^3)
     meteo = isnothing(meteo) ? get_meteo(day) : meteo
     isempty(meteo) && throw(ArgumentError("No meteorology for $day"))
     all(row -> Date(row.date) == day, meteo) || throw(ArgumentError(
@@ -28,7 +29,10 @@ function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), mete
         scene_rotation_deg=pvconfig.panel_orientation,
     )
     meteo = archimed_meteo(meteo, options)
-    light_sim = LightSimulation(scene, agripv_models(); options)
+    # Dense scenes exceed ArchimedLight's default 512 MiB response budget.
+    # Keep directional responses resident instead of rerasterizing every hour.
+    light_sim = LightSimulation(scene, agripv_models(); options,
+        memory_limit_bytes=light_cache_memory_limit_bytes)
 
     # Indexed kinds cover actual geometry without a scene-sized ID tuple.
     geometry_targets = Many(
@@ -95,7 +99,8 @@ function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), mete
 end
 
 """
-    day_simulation(; pvconfig, day, keep_leaves=true, keep_light=true, scene_kwargs=(), meteo=nothing)
+    day_simulation(; pvconfig, day, keep_leaves=true, keep_light=true, scene_kwargs=(),
+                   meteo=nothing, light_cache_memory_limit_bytes=2 * 1024^3)
 
 Run hourly radiation on all geometry and physiology on active leaf sections.
 Return wide `leaves`, `light` and `plants` DataFrames, plus the simulation,
@@ -108,10 +113,14 @@ actual step durations. Set `keep_leaves=false, keep_light=false` for plant
 summaries alone. No global long-table sort or automatic resampling is needed.
 Supply `meteo` to reuse already-read forcing for this date; otherwise the
 climate file is read by `get_meteo(day)`.
+`light_cache_memory_limit_bytes` budgets resident directional radiation responses
+(2 GiB by default); pass `nothing` to use ArchimedLight's package default.
 """
 function day_simulation(; pvconfig, day, keep_leaves=true, keep_light=true,
-    scene_kwargs=NamedTuple(), meteo=nothing)
-    setup = prepare_day_simulation(; pvconfig, day, scene_kwargs, meteo)
+    scene_kwargs=NamedTuple(), meteo=nothing,
+    light_cache_memory_limit_bytes=2 * 1024^3)
+    setup = prepare_day_simulation(; pvconfig, day, scene_kwargs, meteo,
+        light_cache_memory_limit_bytes)
     requests = plant_output_requests()
     if keep_leaves
         append!(requests, leaf_output_requests())
@@ -147,8 +156,15 @@ end
 #     Ra_NIR_q=(:absorbed_energy, :total, :nir),
 # )
 
-function read_component_values(; csv_path, timestep=1, variable=:Ri_PAR_f)
-    component_values = CSV.read(csv_path, DataFrame)
+isdefined(@__MODULE__, :_agripv_open_light) || include("light_output_io.jl")
+
+function read_component_values(; csv_path, timestep=1, variable=:Ra_PAR_f)
+    component_values = _agripv_open_light(csv_path) do io
+        CSV.read(io, DataFrame)
+    end
+    if :timestep ∉ propertynames(component_values) && :datetime in propertynames(component_values)
+        _agripv_restore_light_timestep!(component_values, Date(first(component_values.datetime)))
+    end
     # Current tables and legacy ArchimedLight exports both use actual MTG IDs.
     step_column = :timestep in propertynames(component_values) ? :timestep : :step_number
     sdf = filter(step_column => ==(timestep), component_values)

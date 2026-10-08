@@ -46,7 +46,10 @@ daily table to a CSV per configuration and table in `output_dir`. Retain at
 most one day's model and outputs in memory. Panels use the supplied PV config;
 plant rotations are reused throughout the period.
 
-Rows keep the daily schema and add `day` and `config_id`. Node identities and
+Leaf and plant rows keep the daily schema and add `day` and `config_id`.
+Light defaults to eight columns in `.csv.gz`: datetime, node_id, plant_id,
+plant_instance_id, scale, kind, Ra_PAR_f and area. `compact_light=false`
+preserves the legacy full, uncompressed light export. Node identities and
 `timestep` are local to each day; plant cumulative quantities reset daily.
 `plant_instance_id` tracks the same planting position across days within this
 configuration, provided the planting layout stays fixed.
@@ -57,7 +60,7 @@ Return output paths, simulated dates and row counts, rather than all tables.
 function year_simulation(; pvconfig, config_id,
     plant_dir=joinpath(_agripv_project_root(), "2_outputs", "archicrop"),
     plant_pattern="*.obj", days=nothing, meteo=nothing,
-    keep_leaves=true, keep_light=true, scene_kwargs=NamedTuple(),
+    keep_leaves=true, keep_light=true, compact_light=true, scene_kwargs=NamedTuple(),
     output_dir=joinpath(_agripv_project_root(), "2_outputs", "simulations", "yearly"),
 )
     sources = plant_simulation_days(; plant_dir, plant_pattern)
@@ -79,7 +82,7 @@ function year_simulation(; pvconfig, config_id,
     filenames = (
         leaves="out_config_$(config_id).csv",
         plants="plants_config_$(config_id).csv",
-        light="light_config_$(config_id).csv",
+        light="light_config_$(config_id).csv$(compact_light ? ".gz" : "")",
         metadata="scene_config_$(config_id).toml",
     )
     counts = Dict(name => 0 for name in (:leaves, :plants, :light))
@@ -109,10 +112,14 @@ function year_simulation(; pvconfig, config_id,
             for name in (:leaves, :plants, :light)
                 table = getproperty(result, name)
                 ncol(table) == 0 && continue
-                table.day = fill(source.day, nrow(table))
-                table.config_id = fill(config_id, nrow(table))
                 path = joinpath(staging, getproperty(filenames, name))
-                CSV.write(path, table; append=isfile(path))
+                if name == :light && compact_light
+                    CSV.write(path, _agripv_compact_light(table); compress=:gzip, append=isfile(path))
+                else
+                    table.day = fill(source.day, nrow(table))
+                    table.config_id = fill(config_id, nrow(table))
+                    CSV.write(path, table; append=isfile(path))
+                end
                 counts[name] += nrow(table)
             end
             # Release model state and daily outputs before the next scene.
@@ -146,6 +153,9 @@ function year_simulation(; pvconfig, config_id,
                 rm(destination) # A rerun may deliberately omit leaves/light.
             end
         end
+        # Remove the alternate light format only after successful publication.
+        alternate = joinpath(output_dir, "light_config_$(config_id).csv$(compact_light ? "" : ".gz")")
+        isfile(alternate) && rm(alternate)
     end
     paths = (; (name => (name == :metadata || isfile(joinpath(output_dir, getproperty(filenames, name))) ?
         joinpath(output_dir, getproperty(filenames, name)) : nothing)

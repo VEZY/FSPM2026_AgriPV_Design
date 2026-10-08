@@ -132,7 +132,7 @@ const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow p
 
             mktempdir() do output_dir
                 Random.seed!(7302)
-                result = year_simulation(; pvconfig=config, config_id, plant_dir,
+                result = year_simulation(; compact_light=false, pvconfig=config, config_id, plant_dir,
                     days=reverse(days), meteo=forcing, scene_kwargs, output_dir)
                 @test result.days == days
                 @test all(isfile, values(result.paths))
@@ -249,13 +249,13 @@ const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow p
 
                 # Preflight failures must leave the successful configuration intact.
                 before = saved_snapshot(output_dir)
-                @test_throws ArgumentError year_simulation(; pvconfig=config, config_id,
+                @test_throws ArgumentError year_simulation(; compact_light=false, pvconfig=config, config_id,
                     plant_dir, days, meteo=get_meteo(first(days)), scene_kwargs, output_dir)
                 @test saved_snapshot(output_dir) == before
-                @test_throws ArgumentError year_simulation(; pvconfig=config, config_id,
+                @test_throws ArgumentError year_simulation(; compact_light=false, pvconfig=config, config_id,
                     plant_dir, days=[Date(2024, 1, 1)], meteo=forcing, scene_kwargs, output_dir)
                 @test saved_snapshot(output_dir) == before
-                @test_throws ArgumentError year_simulation(; pvconfig=config, config_id,
+                @test_throws ArgumentError year_simulation(; compact_light=false, pvconfig=config, config_id,
                     plant_dir, days=Date[], meteo=forcing, scene_kwargs, output_dir)
                 @test saved_snapshot(output_dir) == before
 
@@ -264,17 +264,31 @@ const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow p
                 original_mtg = read(second_mtg)
                 try
                     write(second_mtg, "Deliberately invalid MTG file\n")
-                    @test_throws Exception year_simulation(; pvconfig=config, config_id,
+                    @test_throws Exception year_simulation(; compact_light=false, pvconfig=config, config_id,
                         plant_dir, days, meteo=forcing, scene_kwargs, output_dir)
                     @test saved_snapshot(output_dir) == before
                 finally
                     write(second_mtg, original_mtg)
                 end
 
+                # Exercise the default compact yearly writer and publication cleanup.
+                first_hour = TimeStepTable([first(forcing)], PlantMeteo.metadata(forcing))
+                compact = year_simulation(; pvconfig=config, config_id, plant_dir,
+                    days=days[1:1], meteo=first_hour, scene_kwargs, output_dir)
+                @test endswith(compact.paths.light, ".csv.gz")
+                @test !isfile(result.paths.light)
+                compact_table = _agripv_open_light(compact.paths.light) do io
+                    CSV.read(io, DataFrame)
+                end
+                @test propertynames(compact_table) == AGRIPV_LIGHT_EXPORT_COLUMNS
+                @test nrow(compact_table) == compact.rows.light
+                @test all(==(DateTime(first(forcing).date)), compact_table.datetime)
+                @test all(!ismissing, compact_table.Ra_PAR_f)
+
                 # A one-step rerun checks selective retention and stale CSV cleanup
                 # without repeating the two complete simulated days.
                 first_hour = TimeStepTable([first(forcing)], PlantMeteo.metadata(forcing))
-                summary = year_simulation(; pvconfig=config, config_id, plant_dir,
+                summary = year_simulation(; compact_light=false, pvconfig=config, config_id, plant_dir,
                     days=days[1:1], meteo=first_hour, scene_kwargs, output_dir,
                     keep_leaves=false, keep_light=false)
                 @test summary.paths.leaves === nothing

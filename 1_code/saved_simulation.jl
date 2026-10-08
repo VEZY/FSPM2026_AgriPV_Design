@@ -1,6 +1,8 @@
 using CSV, DataFrames, Dates, SHA, TOML
 using MultiScaleTreeGraph, PlantGeom, GeometryBasics
 
+isdefined(@__MODULE__, :_agripv_compact_light) || include("light_output_io.jl")
+
 _agripv_saved_file_sha256(path) = bytes2hex(open(SHA.sha256, path))
 
 isdefined(@__MODULE__, :ConfigPV) || include("pvconfig.jl")
@@ -38,13 +40,14 @@ end
 """
     write_day_outputs(result; config_id, output_dir=...)
 
-Write the leaf, plant and light CSVs and `scene_config_ID_DATE.toml` beside them.
+Write the leaf and plant CSVs and compact gzip light results and `scene_config_ID_DATE.toml` beside them.
 The sidecar stores the resolved PV configuration, actual plant rotations,
 scene settings and source-file hashes. Keep it with the CSVs to reconstruct
 the original scene later with `load_day_outputs`, without rerunning physics.
+`compact_light=false` preserves the legacy full, uncompressed light export.
 The result must use this version of `agripv_scene`, which records its recipe.
 """
-function write_day_outputs(result; config_id, output_dir=_agripv_daily_output_dir())
+function write_day_outputs(result; config_id, output_dir=_agripv_daily_output_dir(), compact_light=true)
     recipe = result.scene.mtg[:agripv_scene_recipe]
     isnothing(recipe) && throw(ArgumentError(
         "This scene has no saved construction recipe. Generate it with the updated agripv_scene before exporting.",
@@ -62,7 +65,7 @@ function write_day_outputs(result; config_id, output_dir=_agripv_daily_output_di
     paths = (
         leaves=joinpath(output_dir, "out_config_$(config_id)_$(day).csv"),
         plants=joinpath(output_dir, "plants_config_$(config_id)_$(day).csv"),
-        light=joinpath(output_dir, "light_config_$(config_id)_$(day).csv"),
+        light=joinpath(output_dir, "light_config_$(config_id)_$(day).csv$(compact_light ? ".gz" : "")"),
         metadata=joinpath(output_dir, "scene_config_$(config_id)_$(day).toml"),
     )
     fingerprint = agripv_scene_fingerprint(result.scene)
@@ -72,7 +75,11 @@ function write_day_outputs(result; config_id, output_dir=_agripv_daily_output_di
         table = getproperty(result, name)
         ncol(table) == 0 && continue
         path = getproperty(paths, name)
-        CSV.write(path, table)
+        if name == :light && compact_light
+            CSV.write(path, _agripv_compact_light(table); compress=:gzip)
+        else
+            CSV.write(path, table)
+        end
         tables[string(name)] = Dict("file" => basename(path), "sha256" => _agripv_saved_file_sha256(path))
     end
     metadata = Dict(
@@ -171,7 +178,11 @@ function load_day_outputs(; config_id, day, output_dir=_agripv_daily_output_dir(
         path = joinpath(output_dir, info["file"])
         isfile(path) && _agripv_saved_file_sha256(path) == info["sha256"] ||
             throw(ArgumentError("The saved $name CSV is missing or changed: $path"))
-        loaded[name] = _validate_saved_output_table!(CSV.read(path, DataFrame), scene)
+        table = _agripv_open_light(path) do io
+            CSV.read(io, DataFrame)
+        end
+        name == :light && _agripv_restore_light_timestep!(table, recipe["day"])
+        loaded[name] = _validate_saved_output_table!(table, scene)
     end
     return (; scene, leaves=loaded[:leaves], plants=loaded[:plants], light=loaded[:light],
         config, day=Date(recipe["day"]), metadata)

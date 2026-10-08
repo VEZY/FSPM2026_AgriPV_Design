@@ -17,7 +17,7 @@ Pkg.instantiate()
 
 To make a daily simulation, run the script `4.2_run_day_simulation.jl`. It
 writes three CSV tables: `out_config_*` for green leaf sections,
-`light_config_*` for all geometric objects, and `plants_config_*` for plant
+`light_config_*.csv.gz` for absorbed PAR on all geometric objects, and `plants_config_*` for plant
 summaries. These are wide tables: one row per object and publication timestep.
 It also writes `scene_config_ID_DATE.toml` alongside them for scene reconstruction.
 All three include `node_id`, the exact node ID in the returned scene MTG,
@@ -27,7 +27,7 @@ placement attribute, set by `add_plant!(...; id=...)`, and identifies the same
 planting position when scenes are rebuilt with a fixed layout. Ground and
 panels have no plant IDs. `plant_instance_id` is also `missing` for an MTG
 whose Plant ancestor has no placement ID; all MTG identity columns are
-`missing` for generic Object scenarios. `object_id` retains
+`missing` for generic Object scenarios. `object_id` in the returned tables and full exports retains
 the PlantSimEngine identity, which can differ from `node_id`. Neither refers
 to an object's position in an array or to the original OBJ `:Id` attribute,
 which can repeat between plants. `datetime` comes from the forcing.
@@ -100,10 +100,16 @@ in memory. In `2_outputs/simulations/yearly/`, each configuration produces:
 
 - `out_config_ID.csv`: active leaf sections across all simulated days;
 - `plants_config_ID.csv`: plant summaries across all simulated days;
-- `light_config_ID.csv`: radiation on all geometric objects across all days;
+- `light_config_ID.csv.gz`: absorbed PAR on all geometric objects across all days;
 - `scene_config_ID.toml`: dates, per-day scene recipes and fingerprints, and CSV hashes.
 
-CSV columns match the daily tables, with added `day` and `config_id`. Each
+Leaf and plant CSV columns match the daily tables, with added `day` and `config_id`.
+Light files retain only `datetime`, `node_id`, `plant_id`, `plant_instance_id`,
+`scale`, `kind`, `Ra_PAR_f` (W m⁻²) and `area` (m²). Configuration comes from
+the filename and TOML; date and timestep come from timestamps. Both daily and
+yearly exports compress light while writing. `compact_light=false` on either
+writer preserves the full uncompressed legacy light export. Internal simulation
+results still include all radiation variables; this change reduces disk use. Each
 `datetime` is the actual forcing timestamp. `timestep` starts at 1 each day;
 `node_id`, `plant_id` and `object_id` refer to that day's scene and must be used
 together with `day`. Changing plant topology can change these IDs across days.
@@ -150,12 +156,13 @@ processes configurations 0–3 and writes
 configuration and daily curves for plants, solar panels, ground and their sum.
 The horizontal reference at one helps inspect the radiation balance.
 
-`year_fapar.jl` reads each light CSV sequentially in **32 MiB input batches**,
-parses only eight necessary columns, and retains totals per timestamp. It
+`year_fapar.jl` reads plain or gzip light files sequentially in **32 MiB decompressed input batches**,
+parses five required columns plus any legacy validation columns, and retains
+totals per timestamp. It
 never reads or memory maps the entire light file. Parsed columns and Julia's
 runtime require additional memory; memory use is independent of the full CSV
 size. Source SHA256 and row count are checked against the simulation sidecar
-during the same pass, without a second scan.
+with a separate bounded scan for the stored-file hash.
 
 For category `g`, absorbed energy is
 `sum(Ra_PAR_f * area * duration_s)` over its geometric objects and timesteps.
@@ -209,7 +216,7 @@ plant categories, missing dark ratios, batch equivalence and invalid inputs.
 ## Reload CSVs and rebuild their scene
 
 The daily loop calls `write_day_outputs(result; config_id=configID)`. This keeps
-the original three CSV names and adds a small TOML sidecar. It records the
+leaf and plant CSV names, writes compact light as `.csv.gz`, and adds a small TOML sidecar. It records the
 resolved configuration values, date, plant density, ground resolution, exact
 plant OBJ/MTG files and **actual random plant rotations**. Saving the rotations
 matters: calling `agripv_scene` again with only the config/date otherwise gives
@@ -224,7 +231,7 @@ saved = load_day_outputs(config_id=0, day=Date(2025, 7, 2))
 attach_outputs!(saved.scene.mtg, saved.leaves;
     timestep=13, variables=(:A, :Tₗ, :transpiration_flux))
 attach_outputs!(saved.scene.mtg, saved.light;
-    timestep=13, variables=(:Ri_PAR_f,))
+    timestep=13, variables=(:Ra_PAR_f,))
 ```
 
 This reads the CSVs, rebuilds only the scene and reassociates values by `node_id`;
@@ -246,7 +253,7 @@ f, ax, p = plot_output(saved.scene.mtg, saved.leaves;
 
 # Or reload, rebuild, attach and plot in one call:
 f, ax, p = plot_saved_output(config_id=0, day=Date(2025, 7, 2),
-    table=:light, variable=:Ri_PAR_f, timestep=13)
+    table=:light, variable=:Ra_PAR_f, timestep=13)
 ```
 
 `load_day_outputs(...; tables=(:leaves,))` reads only the leaf CSV.
@@ -298,7 +305,9 @@ attach_outputs!(result.scene.mtg, result.leaves; timestep=13)
 attach_outputs!(result.scene.mtg, result.plants; timestep=13, clear=false)
 ```
 
-CSV files keep the same column layout. `read_component_values` accepts current
+Legacy CSV files remain readable. Compact light files omit redundant date,
+configuration and timestep columns; the daily loader restores timestep from
+ordered timestamps. Sidecar SHA256 hashes cover the stored compressed bytes. `read_component_values` accepts current
 `timestep` or legacy `step_number` tables, with `variable` and `timestep`
 keywords, and returns a node-ID dictionary for ArchimedLight's `lightplot`.
 

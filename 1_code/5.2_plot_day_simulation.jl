@@ -56,7 +56,7 @@ end
 # f, ax, p = plot_output(result.scene.mtg, result.leaves;
 #     variable=:A, timestep=13, label="Net assimilation (μmol CO₂ m⁻² s⁻¹)")
 # f, ax, p = plot_output(result.scene.mtg, result.light;
-#     variable=:Ri_PAR_f, timestep=13, label="Incident PAR (W m⁻²)")
+#     variable=:Ra_PAR_f, timestep=13, label="Absorbed PAR (W m⁻²)")
 
 config_id = 1
 day = Date(2025, 7, 2)
