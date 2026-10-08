@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "ffb62550f9a48dd28a29c1d7858e1e18714d8a05"
+project_hash = "5f4ca28347089143a8b7403cc8f0508f786d7b70"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -1796,8 +1796,9 @@ version = "0.9.1"
 
 [[deps.PlantSimEngine]]
 deps = ["CSV", "DataFrames", "Dates", "InteractiveUtils", "JSON", "Markdown", "MultiScaleTreeGraph", "PlantMeteo", "Random", "Statistics", "Tables", "Term"]
-git-tree-sha1 = "8eb006e13516d27c102da2b73c27b65699c4dfd6"
-registries = "General"
+git-tree-sha1 = "6b53a74f1a6c016b8980754ba5aa4538a0a7336c"
+repo-rev = "codex/adaptive-subtree-selectors"
+repo-url = "https://github.com/VirtualPlantLab/PlantSimEngine.jl"
 uuid = "9a576370-710b-4269-adf9-4f603a9c6423"
 version = "0.15.0"
 weakdeps = ["HTTP"]
