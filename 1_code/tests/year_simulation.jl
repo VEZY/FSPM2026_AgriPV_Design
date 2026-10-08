@@ -56,6 +56,34 @@ function assert_daily_rows(table, days, forcing; config_id)
     end
 end
 
+equal_output_value(actual::Real, expected::Real) =
+    isapprox(actual, expected; rtol=1e-6, atol=1e-9, nans=true)
+equal_output_value(actual, expected) = isequal(actual, expected)
+
+function assert_day_equivalence(saved_period_day, standalone_table)
+    buffer = IOBuffer()
+    CSV.write(buffer, standalone_table)
+    seekstart(buffer)
+    expected = CSV.read(buffer, DataFrame; types=Dict(:datetime => DateTime))
+    actual = DataFrames.select(saved_period_day, Not([:day, :config_id]))
+    @test names(actual) == names(expected)
+    @test nrow(actual) == nrow(expected)
+    sort!(actual, [:node_id, :timestep])
+    sort!(expected, [:node_id, :timestep])
+    identities = (:node_id, :plant_id, :plant_instance_id, :object_id,
+        :timestep, :datetime, :scale, :kind)
+    for column in propertynames(expected)
+        @testset "$column" begin
+            if column in identities
+                @test isequal(actual[!, column], expected[!, column])
+            else
+                @test all(pair -> equal_output_value(pair...),
+                    zip(actual[!, column], expected[!, column]))
+            end
+        end
+    end
+end
+
 const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow plant dates" begin
     @testset "Discovery sorts pairs, preserves gaps and rejects ambiguous sources" begin
         mktempdir() do directory
@@ -191,6 +219,32 @@ const YEAR_SIMULATION_TEST_RESULT = @testset "Growth-period simulations follow p
                     @test saved["rows"] == getproperty(result.rows, role)
                     @test saved["file"] == basename(getproperty(result.paths, role))
                     @test saved["sha256"] == file_hash(getproperty(result.paths, role))
+                end
+
+                @testset "Yearly outputs match standalone daily weather and coupled solves" begin
+                    for (index, day) in enumerate(days)
+                        daily_forcing = TableOperations.filter(row -> Date(row.date) == day, forcing) |>
+                            rows -> TimeStepTable(rows, PlantMeteo.metadata(forcing))
+                        source = expected_sources[day]
+                        matching_scene = merge(scene_kwargs, (
+                            obj_path=source.obj_path, mtg_path=source.mtg_path,
+                            plant_rotations=recipes[index]["plant_rotations_rad"],
+                        ))
+                        # Exercise the daily driver's own climate loading, while
+                        # the yearly solve above slices a multi-date forcing table.
+                        standalone = day_simulation(; pvconfig=config, day,
+                            scene_kwargs=matching_scene)
+                        @test agripv_scene_fingerprint(standalone.scene) ==
+                            metadata["scenes"][index]["scene_sha256"]
+                        @test [DateTime(row.date) for row in standalone.meteo] ==
+                            [DateTime(row.date) for row in daily_forcing]
+                        for role in (:leaves, :plants, :light)
+                            @testset "$role on $day" begin
+                                saved_day = filter(:day => ==(day), getproperty(tables, role))
+                                assert_day_equivalence(saved_day, getproperty(standalone, role))
+                            end
+                        end
+                    end
                 end
 
                 # Preflight failures must leave the successful configuration intact.

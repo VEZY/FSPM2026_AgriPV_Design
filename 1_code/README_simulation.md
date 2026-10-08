@@ -64,11 +64,32 @@ another crop series. Dates are sorted chronologically; gaps are not filled.
 Missing MTGs, duplicate plant dates or missing climate dates raise an error.
 The current input series covers 121 days, 2025-03-04 through 2025-07-02.
 
+Both drivers explicitly pass `stics_density = 268.0` plants m⁻² through
+`scene_kwargs=(plant_density=stics_density,)`. Keep this value aligned in
+`4.2_run_day_simulation.jl` and `4.3_run_year_simulation.jl` when changing the
+STICS density. The scene builder rounds the planting layout to fit the domain;
+the requested density and actual rotations are stored in each scene recipe.
+
 The climate file is read once for all configurations. For each date the runner
 builds a fresh scene with that day's growing plant maquette and the supplied
 PV configuration, prepares that day's forcing, and runs the complete daily
 coupling. Plant placements and rotations remain fixed across the period within
 each configuration. The plant geometry changes with the maquettes.
+
+The yearly runner calls `day_simulation` directly: both paths therefore share
+the light options in `prepare_day_simulation` (46 turtle sectors, 0.01 m pixels,
+toricity, scattering, radiation caching, direct light distributed into turtle
+sectors, sky fractions and the PV configuration's scene rotation), the optical
+models, ground grid and PlantBiophysics parameters. Independently started daily
+runs draw new plant rotations; use the yearly recipe's `plant_rotations_rad`
+as `scene_kwargs.plant_rotations` to replay exactly the same scene. The tests
+compare standalone daily results against both dates of a reduced yearly run
+with these rotations and the same weather, density and geometry sources.
+
+Existing output files retain their original scene settings. Rerun simulations
+after changing the density, then recompute yearly faPAR from the new outputs.
+Compare the saved recipes' `plant_density` values before comparing daily and
+yearly results generated at different times.
 
 Results are appended daily, keeping only a single day's simulation and tables
 in memory. In `2_outputs/simulations/yearly/`, each configuration produces:
