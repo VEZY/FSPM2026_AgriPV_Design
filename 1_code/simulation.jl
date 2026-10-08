@@ -30,16 +30,15 @@ function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), mete
     meteo = archimed_meteo(meteo, options)
     light_sim = LightSimulation(scene, agripv_models(); options)
 
-    # Output coverage follows actual geometry, including stems, panels and ground.
-    geometry_ids = Int[]
-    MultiScaleTreeGraph.traverse!(scene.mtg) do node
-        isnothing(node[:geometry]) || push!(geometry_ids, MultiScaleTreeGraph.node_id(node))
-    end
+    # Indexed kinds cover actual geometry without a scene-sized ID tuple.
+    geometry_targets = Many(
+        kind=(:active_leaf, :senescent_leaf, :radiative_geometry), within=SceneScope(),
+    )
     light_application = ModelSpec(
         ArchimedLightModel(light_sim; output_schema=:coupling,
             par_energy_to_photon=PlantMeteo.Constants().J_to_umol);
         name=:archimed_light, on=One(scale=:Scene),
-        outputs_to=(OutputTo(Many(id=geometry_ids, within=SceneScope()); coverage=:exact),),
+        outputs_to=(OutputTo(geometry_targets; coverage=:exact),),
     )
     active_sections = Many(scale=:LeafSection, kind=:active_leaf)
     photosynthesis = ModelSpec(
@@ -65,8 +64,11 @@ function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), mete
         # Retain the existing gs_min=0.001 mol CO₂ m⁻² s⁻¹ conductance floor.
         Medlyn(1e-6, 5.8); name=:stomatal_conductance, on=active_sections,
     )
-    node_kind(node) = MultiScaleTreeGraph.symbol(node) == :LeafSection ?
-                      (node[:state] == "senescent" ? :senescent_leaf : :active_leaf) : nothing
+    function node_kind(node)
+        isnothing(node[:geometry]) && return nothing
+        MultiScaleTreeGraph.symbol(node) == :LeafSection || return :radiative_geometry
+        return node[:state] == "senescent" ? :senescent_leaf : :active_leaf
+    end
     first_forcing = first(meteo)
     # Declare the shared hard-call trial slots explicitly. These match
     # Monteith's initialization, which overwrites them before every leaf solve.

@@ -276,7 +276,9 @@ function collect_selected_outputs(
             steps_column[row] = timestep
             datetimes_column[row] = _selected_output_datetime(forcing_dates, timestep)
             scales_column[row] = isnothing(object.scale) ? missing : object.scale
-            kinds_column[row] = isnothing(object.kind) ? missing : object.kind
+            # Geometry routing is internal; preserve the saved biological metadata.
+            kinds_column[row] = isnothing(object.kind) || object.kind == :radiative_geometry ?
+                                missing : object.kind
             for column in eachindex(streams)
                 samples = streams[column]
                 isnothing(samples) && continue
