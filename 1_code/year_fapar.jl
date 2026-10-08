@@ -1,6 +1,8 @@
 using CSV, DataFrames, Dates, TOML, SHA
 using PlantMeteo, ArchimedLight, TableOperations, PlantMeteo.Tables
 
+isdefined(@__MODULE__, :_agripv_open_light) || include("light_output_io.jl")
+
 isdefined(@__MODULE__, :archimed_meteo) || include("meteo.jl")
 
 _fapar_project_root() = normpath(joinpath(@__DIR__, ".."))
@@ -23,8 +25,9 @@ function _fapar_accumulate!(absorbed, counts, lookup, expected_steps, config_id,
         ismissing(stamp) && throw(ArgumentError("Missing datetime in light results."))
         index = get(lookup, stamp, 0)
         index > 0 || throw(ArgumentError("No incoming forcing for light timestamp $stamp."))
-        isequal(day[row], Date(stamp)) && isequal(timestep[row], expected_steps[index]) &&
-            isequal(row_config[row], config_id) || throw(ArgumentError("Inconsistent light date, timestep or configuration at $stamp."))
+        (isnothing(day) || isequal(day[row], Date(stamp))) &&
+            (isnothing(timestep) || isequal(timestep[row], expected_steps[index])) &&
+            (isnothing(row_config) || isequal(row_config[row], config_id)) || throw(ArgumentError("Inconsistent light date, timestep or configuration at $stamp."))
         flux, surface = ra_par[row], area[row]
         !ismissing(flux) && !ismissing(surface) && isfinite(flux) && isfinite(surface) &&
             flux >= 0 && surface >= 0 || throw(ArgumentError("Invalid Ra_PAR_f or area at $stamp."))
@@ -49,7 +52,8 @@ end
     summarize_year_fapar(; config_id, input_dir=..., batch_bytes=32*1024^2,
         forcing=nothing, verify_hash=true)
 
-Read `light_config_ID.csv` in bounded byte batches, parsing only eight columns.
+Read compact `.csv.gz` or legacy `.csv` light results in bounded byte batches.
+Gzip is decompressed as a stream, including appended daily gzip members.
 Require its `scene_config_ID.toml` sidecar. Return small `hourly` and `daily`
 DataFrames, plus row count and source SHA256. No full-file read or memory map
 is used. The generated light CSV has one record per physical line.
@@ -67,7 +71,8 @@ sky preparation must match the original simulation. No geometry or physics is
 rerun. Daily fractions divide summed energies, rather than averaging hourly
 fractions. Dark hourly fractions are `missing`. Values are not clipped or
 renormalized; `nonabsorbed_fraction = 1 - fapar_total` includes escaping PAR and
-numerical residuals. The source hash is verified during the same input pass.
+numerical residuals. The source hash covers the stored file bytes (compressed bytes for gzip).
+A separate bounded hash pass avoids retaining compressed data in memory.
 """
 function summarize_year_fapar(; config_id,
     input_dir=joinpath(_fapar_project_root(), "2_outputs", "simulations", "yearly"),
@@ -118,35 +123,37 @@ function summarize_year_fapar(; config_id,
     selected = [:datetime, :day, :timestep, :config_id, :plant_id, :scale, :Ra_PAR_f, :area]
     types = Dict(:datetime => DateTime, :day => Date, :timestep => Int,
         :config_id => Int, :plant_id => Int, :scale => String, :Ra_PAR_f => Float64, :area => Float64)
-    digest = SHA.SHA2_256_CTX()
+    required = [:datetime, :plant_id, :scale, :Ra_PAR_f, :area]
     nrows = 0
     last_report = time()
-    open(path, "r") do io
+    _agripv_open_light(path) do io
         header = readline(io; keep=true)
         names = Symbol.(split(chomp(header), ','))
-        isempty(setdiff(selected, names)) || throw(ArgumentError("Light CSV is missing required columns $selected."))
-        SHA.update!(digest, codeunits(header))
+        isempty(setdiff(required, names)) || throw(ArgumentError("Light CSV is missing required columns $required."))
+        selected = intersect(selected, names)
+        batch_types = Dict(name => types[name] for name in selected)
         while !eof(io)
             buffer = IOBuffer(; sizehint=batch_bytes)
             while position(buffer) < batch_bytes && !eof(io)
                 copyline(buffer, io; keep=true)
             end
             bytes = take!(buffer)
-            SHA.update!(digest, bytes)
-            table = CSV.File(bytes; header=names, select=selected, types,
+            table = CSV.File(bytes; header=names, select=selected, types=batch_types,
                 ntasks=1, strict=true, pool=true)
             _fapar_accumulate!(absorbed, counts, lookup, expected_steps, config_id,
-                table.datetime, table.day, table.timestep, table.config_id,
+                table.datetime, :day in selected ? table.day : nothing,
+                :timestep in selected ? table.timestep : nothing,
+                :config_id in selected ? table.config_id : nothing,
                 table.plant_id, table.scale, table.Ra_PAR_f, table.area)
             nrows += length(table)
             table = nothing
             if time() - last_report >= 20
-                @info "Reading yearly light CSV" config_id rows=nrows percent=round(100 * position(io) / filesize(path); digits=1)
+                @info "Reading yearly light CSV" config_id rows=nrows
                 last_report = time()
             end
         end
     end
-    source_sha256 = bytes2hex(SHA.digest!(digest))
+    source_sha256 = bytes2hex(open(SHA.sha256, path))
     verify_hash && source_sha256 != light_info["sha256"] && throw(ArgumentError("Light CSV hash differs from the saved simulation."))
     nrows == light_info["rows"] || throw(ArgumentError("Light CSV row count differs from its saved metadata."))
     all(>(0), vec(sum(counts; dims=1))) || throw(ArgumentError("Some forcing timesteps have no light rows."))

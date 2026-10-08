@@ -29,6 +29,14 @@ function nearest_plant_id(node)
     return missing
 end
 
+function nearest_plant_instance_id(node)
+    while !isnothing(node)
+        MultiScaleTreeGraph.symbol(node) == :Plant && return node[:plantID]
+        node = parent(node)
+    end
+    return missing
+end
+
 function output_kind(node)
     MultiScaleTreeGraph.symbol(node) == :LeafSection || return missing
     return node[:state] == "senescent" ? :senescent_leaf : :active_leaf
@@ -37,7 +45,8 @@ end
 # Prescribed values exercise persistence only; no radiation or physiology is run.
 function prescribed_saved_tables(scene, day)
     light = DataFrame(
-        node_id=Int[], plant_id=Union{Missing,Int}[], timestep=Int[],
+        node_id=Int[], plant_id=Union{Missing,Int}[],
+        plant_instance_id=Union{Missing,Int}[], timestep=Int[],
         datetime=DateTime[], object_id=Int[], scale=Symbol[],
         kind=Union{Missing,Symbol}[], area=Float64[],
         Ri_PAR_f=Float64[], Ra_PAR_f=Float64[], aPPFD=Float64[],
@@ -47,7 +56,8 @@ function prescribed_saved_tables(scene, day)
     for node in geometry_nodes, step in 1:2
         id = node_id(node)
         push!(light, (
-            id, nearest_plant_id(node), step, DateTime(day) + Hour(step - 1),
+            id, nearest_plant_id(node), nearest_plant_instance_id(node),
+            step, DateTime(day) + Hour(step - 1),
             id, MultiScaleTreeGraph.symbol(node), output_kind(node), areas[id],
             100.0 + step + 0.01 * id, 50.0 + step, 150.0 + step,
         ))
@@ -58,14 +68,15 @@ function prescribed_saved_tables(scene, day)
     leaves[!, :Gₛ] = fill(0.2, nrow(leaves))
     leaves[!, :λE] = fill(100.0, nrow(leaves))
     plants = DataFrame(
-        node_id=Int[], plant_id=Union{Missing,Int}[], timestep=Int[],
+        node_id=Int[], plant_id=Union{Missing,Int}[],
+        plant_instance_id=Union{Missing,Int}[], timestep=Int[],
         datetime=DateTime[], object_id=Int[], scale=Symbol[],
         kind=Union{Missing,Symbol}[], A_plant=Float64[],
     )
     plant_nodes = sort(AgripvSceneTests.nodes_with_symbol(scene.mtg, :Plant); by=node_id)
     for node in plant_nodes, step in 1:2
         id = node_id(node)
-        push!(plants, (id, id, step, DateTime(day) + Hour(step - 1),
+        push!(plants, (id, id, node[:plantID], step, DateTime(day) + Hour(step - 1),
             id, :Plant, missing, 2.0 * step))
     end
     return (; leaves, plants, light)
@@ -85,7 +96,7 @@ function with_saved_fixture(f)
         tables = prescribed_saved_tables(scene, day)
         result = (; scene, tables...)
         output_dir = joinpath(directory, "saved")
-        paths = write_day_outputs(result; config_id, output_dir)
+        paths = write_day_outputs(result; compact_light=false, config_id, output_dir)
         return f((; scene, result, config, config_id, day, paths,
             output_dir, obj_path, mtg_path))
     end
@@ -167,6 +178,12 @@ const SAVED_SIMULATION_TEST_RESULT = @testset "Saved daily outputs reconstruct t
             @test all(==(:active_leaf), loaded.leaves.kind)
             @test any(ismissing, loaded.light.kind)
             @test Set(loaded.light.node_id) == Set(keys(loaded.scene.nodes))
+            @test Set(loaded.plants.plant_instance_id) == Set([2, 3])
+            mtg_geometry_nodes = Dict(node_id(node) => node for node in
+                AgripvSceneTests.geometry_nodes(loaded.scene.mtg))
+            @test all(row -> isequal(row.plant_instance_id,
+                nearest_plant_instance_id(mtg_geometry_nodes[row.node_id])),
+                eachrow(loaded.light))
 
             attach_outputs!(loaded.scene.mtg, loaded.light; timestep=2, variables=[:Ri_PAR_f])
             expected_light = Dict(row.node_id => row.Ri_PAR_f for row in eachrow(loaded.light)
@@ -192,6 +209,19 @@ const SAVED_SIMULATION_TEST_RESULT = @testset "Saved daily outputs reconstruct t
             @test agripv_scene_fingerprint(loaded.scene) == agripv_scene_fingerprint(f.scene)
             @test_throws ArgumentError load_day_outputs(;
                 f.config_id, f.day, f.output_dir, tables=(:unsupported,))
+        end
+    end
+
+    @testset "Legacy daily tables do not require the added planting identity" begin
+        with_saved_fixture() do f
+            for role in (:leaves, :plants, :light)
+                loaded = change_csv_with_matching_hash(f, role,
+                    table -> DataFrames.select(table, Not(:plant_instance_id)))
+                @test :plant_instance_id ∉ propertynames(getproperty(loaded, role))
+                @test isequal(getproperty(loaded, role),
+                    DataFrames.select(getproperty(f.result, role), Not(:plant_instance_id)))
+                @test agripv_scene_fingerprint(loaded.scene) == agripv_scene_fingerprint(f.scene)
+            end
         end
     end
 
@@ -244,8 +274,36 @@ const SAVED_SIMULATION_TEST_RESULT = @testset "Saved daily outputs reconstruct t
                 table.plant_id[1] = node_id(f.scene.mtg)
                 table
             end)
+            for role in (:leaves, :plants, :light)
+                @test_throws ArgumentError change_csv_with_matching_hash(f, role, table -> begin
+                    table.plant_instance_id[1] = 999
+                    table
+                end)
+            end
+            @test_throws ArgumentError change_csv_with_matching_hash(f, :light, table -> begin
+                row = findfirst(ismissing, table.plant_instance_id)
+                @test !isnothing(row)
+                table.plant_instance_id[row] = 1
+                table
+            end)
         end
     end
+    @testset "Compact gzip light export reloads the same absorbed PAR and identities" begin
+        with_saved_fixture() do f
+            paths = write_day_outputs(f.result; config_id=f.config_id, output_dir=f.output_dir)
+            @test endswith(paths.light, ".csv.gz")
+            stored = _agripv_open_light(paths.light) do io
+                CSV.read(io, DataFrame)
+            end
+            @test propertynames(stored) == AGRIPV_LIGHT_EXPORT_COLUMNS
+            loaded = load_day_outputs(; f.config_id, f.day, f.output_dir)
+            expected = DataFrames.select(f.result.light, [AGRIPV_LIGHT_EXPORT_COLUMNS; :timestep])
+            @test isequal(loaded.light, expected)
+            @test isequal(loaded.leaves, f.result.leaves)
+            @test isequal(loaded.plants, f.result.plants)
+        end
+    end
+
 end
 
 end # module AgripvSavedSimulationTests

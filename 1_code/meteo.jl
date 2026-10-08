@@ -44,13 +44,15 @@ function archimed_meteo(meteo, options::LightOptions)
     # The 0.15 light model consumes explicit solar geometry and partition.
     # Use ArchimedLight's documented advanced sky stage to retain the
     # same sun reconstruction and clearness assumptions as run_light.
-    forcing = DataFrame(prepare_meteo(meteo, options))
-    forcing.latitude = fill(48.0, nrow(forcing))
-    skies = [ArchimedLight.compute_sky(r, options) for r in eachrow(forcing)]
+    prepared = prepare_meteo(meteo, options)
+    # Keep the site's latitude metadata when reconstructing solar geometry.
+    # Montpellier weather supplies 43.61°; DataFrame rows lose this metadata.
+    skies = [ArchimedLight.compute_sky(r, options) for r in prepared]
+    forcing = DataFrame(prepared)
     forcing.sun_azimuth_deg = getproperty.(skies, :sun_azimuth_deg)
     forcing.sun_elevation_deg = getproperty.(skies, :sun_elevation_deg)
     forcing.direct_fraction = getproperty.(skies, :direct_fraction)
     forcing.Ri_PAR_f = getproperty.(skies, :ri_par_f)
     forcing.Ri_NIR_f = getproperty.(skies, :ri_nir_f)
-    return TimeStepTable(forcing, PlantMeteo.metadata(meteo))
+    return TimeStepTable(forcing, PlantMeteo.metadata(prepared))
 end

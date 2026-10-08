@@ -88,6 +88,7 @@ end
     @test eltype(leaves.object_id) == Int
     @test all(ismissing, leaves.node_id)
     @test all(ismissing, leaves.plant_id)
+    @test all(ismissing, leaves.plant_instance_id)
     @test nrow(light) == 16
     @test Set(light.object_id) == Set([10, 2, 3, 4])
     @test Set(light.scale) == Set([:LeafSection, :Panel])
@@ -122,6 +123,9 @@ end
     @test_throws ArgumentError collect_selected_outputs(
         simulation, model; columns=(timestep=(:energy_balance, :A),),
     )
+    @test_throws ArgumentError collect_selected_outputs(
+        simulation, model; columns=(plant_instance_id=(:energy_balance, :A),),
+    )
 end
 
 @testset "selected retention, dates, and empty targets" begin
@@ -148,7 +152,7 @@ end
         simulation, model; columns=(A=(:energy_balance, :A),), scale=:Absent,
     )
     @test nrow(empty) == 0
-    @test names(empty) == ["node_id", "plant_id", "timestep", "datetime", "object_id", "scale", "kind", "A"]
+    @test names(empty) == ["node_id", "plant_id", "plant_instance_id", "timestep", "datetime", "object_id", "scale", "kind", "A"]
 end
 
 end # module AgripvOutputTests

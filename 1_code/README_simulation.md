@@ -17,12 +17,17 @@ Pkg.instantiate()
 
 To make a daily simulation, run the script `4.2_run_day_simulation.jl`. It
 writes three CSV tables: `out_config_*` for green leaf sections,
-`light_config_*` for all geometric objects, and `plants_config_*` for plant
+`light_config_*.csv.gz` for absorbed PAR on all geometric objects, and `plants_config_*` for plant
 summaries. These are wide tables: one row per object and publication timestep.
 It also writes `scene_config_ID_DATE.toml` alongside them for scene reconstruction.
 All three include `node_id`, the exact node ID in the returned scene MTG,
 and `plant_id`, its nearest Plant ancestor's node ID. A Plant row uses its
-own ID as `plant_id`; ground and panels have no plant ID. `object_id` retains
+own node ID as `plant_id`. `plant_instance_id` is the Plant ancestor's `:plantID`
+placement attribute, set by `add_plant!(...; id=...)`, and identifies the same
+planting position when scenes are rebuilt with a fixed layout. Ground and
+panels have no plant IDs. `plant_instance_id` is also `missing` for an MTG
+whose Plant ancestor has no placement ID; all MTG identity columns are
+`missing` for generic Object scenarios. `object_id` in the returned tables and full exports retains
 the PlantSimEngine identity, which can differ from `node_id`. Neither refers
 to an object's position in an array or to the original OBJ `:Id` attribute,
 which can repeat between plants. `datetime` comes from the forcing.
@@ -59,27 +64,66 @@ another crop series. Dates are sorted chronologically; gaps are not filled.
 Missing MTGs, duplicate plant dates or missing climate dates raise an error.
 The current input series covers 121 days, 2025-03-04 through 2025-07-02.
 
+Both drivers explicitly pass `stics_density = 268.0` plants m⁻² through
+`scene_kwargs=(plant_density=stics_density,)`. Keep this value aligned in
+`4.2_run_day_simulation.jl` and `4.3_run_year_simulation.jl` when changing the
+STICS density. The scene builder rounds the planting layout to fit the domain;
+the requested density and actual rotations are stored in each scene recipe.
+
 The climate file is read once for all configurations. For each date the runner
 builds a fresh scene with that day's growing plant maquette and the supplied
 PV configuration, prepares that day's forcing, and runs the complete daily
 coupling. Plant placements and rotations remain fixed across the period within
 each configuration. The plant geometry changes with the maquettes.
 
+Solar geometry uses the latitude in the weather metadata: **43.61° N** for
+Montpellier. Sky preparation retains this metadata when computing sun angles.
+
+The yearly runner calls `day_simulation` directly: both paths therefore share
+the light options in `prepare_day_simulation` (46 turtle sectors, 0.01 m pixels,
+toricity, scattering, radiation caching, direct light distributed into turtle
+sectors, sky fractions and the PV configuration's scene rotation), the optical
+models, ground grid and PlantBiophysics parameters. Independently started daily
+runs draw new plant rotations; use the yearly recipe's `plant_rotations_rad`
+as `scene_kwargs.plant_rotations` to replay exactly the same scene. The tests
+compare standalone daily results against both dates of a reduced yearly run
+with these rotations and the same weather, density and geometry sources.
+
+Existing output files retain their original scene settings. Rerun simulations
+after changing the density or solar geometry, then recompute yearly faPAR from
+the new outputs.
+Compare the saved recipes' `plant_density` values before comparing daily and
+yearly results generated at different times.
+
 Results are appended daily, keeping only a single day's simulation and tables
 in memory. In `2_outputs/simulations/yearly/`, each configuration produces:
 
 - `out_config_ID.csv`: active leaf sections across all simulated days;
 - `plants_config_ID.csv`: plant summaries across all simulated days;
-- `light_config_ID.csv`: radiation on all geometric objects across all days;
+- `light_config_ID.csv.gz`: absorbed PAR on all geometric objects across all days;
 - `scene_config_ID.toml`: dates, per-day scene recipes and fingerprints, and CSV hashes.
 
-CSV columns match the daily tables, with added `day` and `config_id`. Each
+Leaf and plant CSV columns match the daily tables, with added `day` and `config_id`.
+Light files retain only `datetime`, `node_id`, `plant_id`, `plant_instance_id`,
+`scale`, `kind`, `Ra_PAR_f` (W m⁻²) and `area` (m²). Configuration comes from
+the filename and TOML; date and timestep come from timestamps. Both daily and
+yearly exports compress light while writing. `compact_light=false` on either
+writer preserves the full uncompressed legacy light export. Internal simulation
+results still include all radiation variables; this change reduces disk use. Each
 `datetime` is the actual forcing timestamp. `timestep` starts at 1 each day;
 `node_id`, `plant_id` and `object_id` refer to that day's scene and must be used
 together with `day`. Changing plant topology can change these IDs across days.
+Use `(config_id, plant_instance_id)` to follow a planted individual across
+days, and `(config_id, day, node_id)` to locate an exact daily scene node.
+`plant_instance_id` stays fixed because it comes from the plant's placement ID,
+independently of its changing organ count. This requires a fixed planting layout
+and plant enumeration within each configuration; it does not identify the same
+plant across different configurations. The TOML records
+`plant_instance_identity_scope = "configuration"`, alongside the existing
+`identity_scope = "day"` for scene node identities.
 The plant `assimilation_cumulative` and `transpiration_cumulative` columns are
 **within-day** cumuls, reset at each new daily simulation. Use the step amounts
-and an explicit plant correspondence to compute period totals. This workflow
+grouped by `(config_id, plant_instance_id)` to compute period totals. This workflow
 uses supplied growth geometry; it does not feed assimilation back into growth.
 
 Exports are built in a temporary directory and replace the configuration's
@@ -112,12 +156,13 @@ processes configurations 0–3 and writes
 configuration and daily curves for plants, solar panels, ground and their sum.
 The horizontal reference at one helps inspect the radiation balance.
 
-`year_fapar.jl` reads each light CSV sequentially in **32 MiB input batches**,
-parses only eight necessary columns, and retains totals per timestamp. It
+`year_fapar.jl` reads plain or gzip light files sequentially in **32 MiB decompressed input batches**,
+parses five required columns plus any legacy validation columns, and retains
+totals per timestamp. It
 never reads or memory maps the entire light file. Parsed columns and Julia's
 runtime require additional memory; memory use is independent of the full CSV
 size. Source SHA256 and row count are checked against the simulation sidecar
-during the same pass, without a second scan.
+with a separate bounded scan for the stored-file hash.
 
 For category `g`, absorbed energy is
 `sum(Ra_PAR_f * area * duration_s)` over its geometric objects and timesteps.
@@ -171,7 +216,7 @@ plant categories, missing dark ratios, batch equivalence and invalid inputs.
 ## Reload CSVs and rebuild their scene
 
 The daily loop calls `write_day_outputs(result; config_id=configID)`. This keeps
-the original three CSV names and adds a small TOML sidecar. It records the
+leaf and plant CSV names, writes compact light as `.csv.gz`, and adds a small TOML sidecar. It records the
 resolved configuration values, date, plant density, ground resolution, exact
 plant OBJ/MTG files and **actual random plant rotations**. Saving the rotations
 matters: calling `agripv_scene` again with only the config/date otherwise gives
@@ -186,7 +231,7 @@ saved = load_day_outputs(config_id=0, day=Date(2025, 7, 2))
 attach_outputs!(saved.scene.mtg, saved.leaves;
     timestep=13, variables=(:A, :Tₗ, :transpiration_flux))
 attach_outputs!(saved.scene.mtg, saved.light;
-    timestep=13, variables=(:Ri_PAR_f,))
+    timestep=13, variables=(:Ra_PAR_f,))
 ```
 
 This reads the CSVs, rebuilds only the scene and reassociates values by `node_id`;
@@ -195,6 +240,9 @@ is used even if the DOE CSV has since changed. Source-file hashes, node metadata
 world-space scene geometry and CSV hashes must match. Keep the TOML and CSVs
 together; source paths are relative to this project, so the project can move.
 The original OBJ/MTG inputs must remain available and unchanged.
+Earlier exports with a TOML recipe remain readable when their tables have no
+`plant_instance_id` column. New exports include that column, and the loader
+checks it against the rebuilt scene's Plant placement IDs.
 
 For plotting, execute with `mt=true`:
 
@@ -205,7 +253,7 @@ f, ax, p = plot_output(saved.scene.mtg, saved.leaves;
 
 # Or reload, rebuild, attach and plot in one call:
 f, ax, p = plot_saved_output(config_id=0, day=Date(2025, 7, 2),
-    table=:light, variable=:Ri_PAR_f, timestep=13)
+    table=:light, variable=:Ra_PAR_f, timestep=13)
 ```
 
 `load_day_outputs(...; tables=(:leaves,))` reads only the leaf CSV.
@@ -257,7 +305,9 @@ attach_outputs!(result.scene.mtg, result.leaves; timestep=13)
 attach_outputs!(result.scene.mtg, result.plants; timestep=13, clear=false)
 ```
 
-CSV files keep the same column layout. `read_component_values` accepts current
+Legacy CSV files remain readable. Compact light files omit redundant date,
+configuration and timestep columns; the daily loader restores timestep from
+ordered timestamps. Sidecar SHA256 hashes cover the stored compressed bytes. `read_component_values` accepts current
 `timestep` or legacy `step_number` tables, with `variable` and `timestep`
 keywords, and returns a node-ID dictionary for ArchimedLight's `lightplot`.
 

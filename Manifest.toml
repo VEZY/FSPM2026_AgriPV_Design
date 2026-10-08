@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "53d587f4742ca41274c8590658c2a066551387dc"
+project_hash = "b6382c1ea7ab174c24c081a287adbf7a3f7ed519"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -66,10 +66,10 @@ version = "0.1.45"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra"]
-git-tree-sha1 = "0d64e8eff17936a5e10e61a9d054e1f716792da9"
+git-tree-sha1 = "dee8388a9bec89c8713ad176f96960ae2f98598a"
 registries = "General"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "4.7.3"
+version = "4.7.4"
 weakdeps = ["SparseArrays", "StaticArrays"]
 
     [deps.Adapt.extensions]
@@ -121,8 +121,9 @@ version = "0.4.2"
 
 [[deps.ArchimedLight]]
 deps = ["Adapt", "CSV", "Dates", "GeometryBasics", "KernelAbstractions", "LinearAlgebra", "MultiScaleTreeGraph", "OrderedCollections", "PlantGeom", "PlantMeteo", "Serialization", "StaticArrays", "Tables", "YAML"]
-git-tree-sha1 = "0042a7943e50fa38896237aea7f2e9f703f212e2"
-registries = "General"
+git-tree-sha1 = "d02b159ba178eb9a7898c16764287fa201cd9db1"
+repo-rev = "codex/reuse-scene-node-index"
+repo-url = "https://github.com/VEZY/ArchimedLight.jl"
 uuid = "ca362a0f-208d-4994-8e0e-d922fd0d438a"
 version = "0.2.0"
 weakdeps = ["Makie", "PlantSimEngine"]
@@ -1757,7 +1758,7 @@ version = "0.3.3"
 
 [[deps.PlantBiophysics]]
 deps = ["CSV", "DataFrames", "Dates", "LsqFit", "OrderedCollections", "PlantMeteo", "PlantSimEngine", "RecipesBase", "Statistics", "YAML"]
-git-tree-sha1 = "21ee627bb05f647cf8272ce4af17f869a7b9c38f"
+git-tree-sha1 = "cded22e133a2660910772dea8b829adfc1222dec"
 repo-rev = "fix-root-in-fvcb"
 repo-url = "https://github.com/VEZY/PlantBiophysics.jl"
 uuid = "7ae8fcfa-76ad-4ec6-9ea7-5f8f5e2d6ec9"
@@ -1795,8 +1796,9 @@ version = "0.9.1"
 
 [[deps.PlantSimEngine]]
 deps = ["CSV", "DataFrames", "Dates", "InteractiveUtils", "JSON", "Markdown", "MultiScaleTreeGraph", "PlantMeteo", "Random", "Statistics", "Tables", "Term"]
-git-tree-sha1 = "8eb006e13516d27c102da2b73c27b65699c4dfd6"
-registries = "General"
+git-tree-sha1 = "6b53a74f1a6c016b8980754ba5aa4538a0a7336c"
+repo-rev = "codex/adaptive-subtree-selectors"
+repo-url = "https://github.com/VirtualPlantLab/PlantSimEngine.jl"
 uuid = "9a576370-710b-4269-adf9-4f603a9c6423"
 version = "0.15.0"
 weakdeps = ["HTTP"]
@@ -1998,10 +2000,10 @@ version = "0.5.2+0"
 
 [[deps.Roots]]
 deps = ["Accessors", "CommonSolve", "Printf"]
-git-tree-sha1 = "971f04b3780c0da4edf230573fc1aadc2c6e649e"
+git-tree-sha1 = "e6ffa7bd4f8d0b8744d18f219304738d952f9a37"
 registries = "General"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "3.0.10"
+version = "3.0.11"
 
     [deps.Roots.extensions]
     RootsChainRulesCoreExt = "ChainRulesCore"
@@ -2169,10 +2171,10 @@ version = "0.1.2"
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
-git-tree-sha1 = "39e70e0ab5d7f89833a62ab7c79df15d4fc417c1"
+git-tree-sha1 = "de349d5585559b692f518b6d3fc7c179d64b2364"
 registries = "General"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.9.22"
+version = "1.9.23"
 weakdeps = ["ChainRulesCore", "Statistics"]
 
     [deps.StaticArrays.extensions]

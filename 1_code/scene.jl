@@ -99,12 +99,16 @@ function agripv_scene(;
     c=get_pvconfig(0),
     day=Date(2025, 5, 15),
     ground_res=60,
+    ground_nx=ground_res,
+    ground_ny=ground_res,
     obj_path=nothing,
     mtg_path=nothing,
     plant_rotations=nothing,
 )
-    nx = round(Int, ground_res * c.panel_x_distance)
-    ny = round(Int, ground_res * c.panel_y_distance)
+    # ground_res is the number of cells per axis, independent of domain size.
+    # Explicit dimensions preserve the grids of previously saved scenes.
+    nx = Int(ground_nx)
+    ny = Int(ground_ny)
 
     # The size of the scene (panel_x_distance, panel_y_distance) should
     # be a multiple of the interrow in x, and of the intrarow in y.
@@ -136,6 +140,7 @@ function agripv_scene(;
         "config" => Dict(string(name) => getproperty(c, name) for name in propertynames(c)),
         "plant_density" => Float64(plant_density),
         "ground_res" => Int(ground_res),
+        "ground_nx" => nx, "ground_ny" => ny,
         "plant_rotations_rad" => rotations,
         "obj_path" => obj_path, "mtg_path" => mtg_path,
         "obj_sha256" => _agripv_file_sha256(obj_path),

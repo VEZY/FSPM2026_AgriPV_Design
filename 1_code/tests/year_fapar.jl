@@ -89,6 +89,35 @@ const YEAR_FAPAR_TEST_RESULT = @testset "Yearly PAR capture uses energy and scen
             forcing=DataFrame(forcing), batch_bytes=73)
         @test isequal(tabular.hourly, hourly) && isequal(tabular.daily, daily)
 
+        # Compact export: each day's append is a separate gzip member.
+        compact = copy(table)
+        compact.plant_instance_id = [ismissing(id) ? missing : 1 for id in compact.plant_id]
+        compressed_path = joinpath(directory, "light_config_$(CONFIG_ID).csv.gz")
+        for day in DAYS
+            chunk = _agripv_compact_light(filter(:day => ==(day), compact))
+            CSV.write(compressed_path, chunk; compress=:gzip, append=isfile(compressed_path))
+        end
+        compact_metadata = TOML.parsefile(joinpath(directory, "scene_config_$(CONFIG_ID).toml"))
+        compact_metadata["tables"]["light"]["file"] = basename(compressed_path)
+        compressed_hash = bytes2hex(open(SHA.sha256, compressed_path))
+        compact_metadata["tables"]["light"]["sha256"] = compressed_hash
+        open(joinpath(directory, "scene_config_$(CONFIG_ID).toml"), "w") do io
+            TOML.print(io, compact_metadata)
+        end
+        for batch_bytes in (1, 73, 4096)
+            compressed = summarize(; batch_bytes)
+            @test isequal(compressed.hourly, hourly)
+            @test isequal(compressed.daily, daily)
+            @test compressed.rows == result.rows
+            @test compressed.source_sha256 == compressed_hash
+        end
+        compact_metadata["tables"]["light"]["sha256"] = repeat("0", 64)
+        open(joinpath(directory, "scene_config_$(CONFIG_ID).toml"), "w") do io
+            TOML.print(io, compact_metadata)
+        end
+        @test_throws ArgumentError summarize(; batch_bytes=73)
+        save_fixture(directory, table)
+
         # Refresh hashes after each corruption so validation checks actual rows.
         for change! in (t -> t.scale[4] = "Unknown", t -> t.scale[4] = missing,
             t -> t.Ra_PAR_f[1] = NaN,
