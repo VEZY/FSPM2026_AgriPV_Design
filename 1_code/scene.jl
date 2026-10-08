@@ -95,14 +95,17 @@ function agripv_models()
 end
 
 function agripv_scene(;
-    plant_density=60.0,
+    plant_density=268.0,
     c=get_pvconfig(0),
-    day=Date(2025, 7, 2),
+    day=Date(2025, 5, 15),
     ground_res=60,
     obj_path=nothing,
     mtg_path=nothing,
     plant_rotations=nothing,
 )
+    nx = round(Int, ground_res * c.panel_x_distance)
+    ny = round(Int, ground_res * c.panel_y_distance)
+
     # The size of the scene (panel_x_distance, panel_y_distance) should
     # be a multiple of the interrow in x, and of the intrarow in y.
     # nb_of_plants = (c.panel_x_distance * c.panel_y_distance) * plant_density
@@ -124,7 +127,7 @@ function agripv_scene(;
     # Save actual radians, rather than a random seed, so reconstruction replays
     # the placements independently of the global RNG and its implementation.
     rotations = isnothing(plant_rotations) ?
-                [deg2rad(randn() * 5.0) for _ in 1:nplants] : Float64.(plant_rotations)
+                [deg2rad(randn() * 50.0) for _ in 1:nplants] : Float64.(plant_rotations)
     length(rotations) == nplants && all(isfinite, rotations) || throw(ArgumentError(
         "plant_rotations must contain $nplants finite angles in radians.",
     ))
@@ -162,7 +165,7 @@ function agripv_scene(;
             )
         end
 
-        add_ground!(s; nx=ground_res, ny=ground_res, group="pavement", type="Cobblestone")
+        add_ground!(s; nx=nx, ny=ny, group="pavement", type="Cobblestone")
     end
 
     scene.mtg[:agripv_scene_recipe] = recipe

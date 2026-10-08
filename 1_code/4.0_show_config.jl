@@ -7,8 +7,8 @@ include("scene.jl")
 include("pvconfig.jl")
 include("meta4glmakie.jl")
 
-configID = 2
-
+configID = 1
+only3D = false
 
 function tile_geometry(scene; nx=5, ny=2)
     models = agripv_models()  # or MakeScene.models("wheat")
@@ -58,6 +58,8 @@ traverse!(scene.mtg) do node
         elseif node[:state] == "senescent"
             node[:color] = RGB(0.72, 0.65, 0.38) # Orange for senescent leaves
         end
+    elseif symbol(node) == :Stem
+        node[:color] = RGB(0.1, 0.4, 0.0) # Dark Green for stems
     elseif symbol(node) == :Panel
         node[:color] = RGB(0.0, 0.0, 0.0) # Black for panels
     elseif symbol(node) == :Cobblestone
@@ -66,7 +68,8 @@ traverse!(scene.mtg) do node
 end
 
 begin
-    f = Figure(size=(900, 700), backgroundcolor=(:white, 0.01))
+    f = Figure(size=(1800, 1400), backgroundcolor=(:white, 0.01))
+    azimuth_offset = 45 # With azimuth_offset=45, the South is at the bottom right and the West is at the bottom left of the figure.
     ax = Axis3(
         f[1, 1],
         aspect=:data,
@@ -74,19 +77,30 @@ begin
         xlabel="x (m)",
         ylabel="y (m)",
         zlabel="z (m)",
-        # xspinesvisible=false,
-        # yspinesvisible=false,
-        # zspinesvisible=false
+        azimuth=deg2rad(azimuth_offset + config.panel_orientation),
+        elevation=deg2rad(30),
     )
 
+    if only3D
+        ax.titlevisible=false
+        ax.xspinesvisible=false
+        ax.yspinesvisible=false
+        ax.zspinesvisible=false
+        hidedecorations!(ax)
+    end
+
     plantviz!(ax, scene.mtg; color=:color)
-    ax.azimuth[]=deg2rad(-135)
-    ax.elevation[]=deg2rad(30)
-    # hidedecorations!(ax)
     f
 end
+
+if only3D
+    img_name = "2_outputs/config_$(configID)_only3D.png"
+else
+    img_name = "2_outputs/config_$(configID).png"
+end
+
+save(img_name, alpha_colorbuffer(f), dpi=300)
 # save("2_outputs/config_$(configID)_nospines.png", alpha_colorbuffer(f), dpi=300)
-save("2_outputs/config_$(configID).png", alpha_colorbuffer(f), dpi=300)
 # save("2_outputs/config_$(configID)_noaxis.png", background=false)
 # save("2_outputs/config_$(configID).png", alpha_colorbuffer(f), update=false, px_per_unit=3.0)
 
