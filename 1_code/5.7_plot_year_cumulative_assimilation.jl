@@ -55,8 +55,9 @@ day_start = DateTime(selected_day)
 day_end = DateTime(selected_day + Day(1))
 df_day = filter(:datetime => x -> day_start <= DateTime(x) < day_end, df)
 df_day_plant = filter(:plant_id => ==(3), df_day)
-unique_plant_ids = unique(df.plant_id)
-id = [1, 2, 1034, 4075]
+
+unique_plant_ids = unique(df.plant_instance_id)
+id = [1, 2, 1034]
 selected_plant_ids = [unique_plant_ids[x] for x in id]
 
 begin
@@ -69,12 +70,12 @@ begin
     )
 
     for plantID in selected_plant_ids
-        df_plant = filter(row -> row.plant_id == plantID && row.configID == 0, df)
+        df_plant = filter(row -> row.plant_instance_id == plantID && row.configID == 0, df)
         lines!(
             ax,
             DateTime.(df_plant.datetime),
             df_plant.assimilation_cumulative;
-            label = "Plant $plantID"
+            label = "plant_instance_id = $plantID"
         )
     end
 

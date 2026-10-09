@@ -187,3 +187,83 @@ function load_day_outputs(; config_id, day, output_dir=_agripv_daily_output_dir(
     return (; scene, leaves=loaded[:leaves], plants=loaded[:plants], light=loaded[:light],
         config, day=Date(recipe["day"]), metadata)
 end
+
+_agripv_yearly_output_dir() = joinpath(_agripv_project_root(), "2_outputs", "simulations", "yearly")
+
+"""
+    load_yearly_scene(; config_id, day, output_dir=...)
+
+Load and rebuild a specific day's scene from a yearly simulation TOML file.
+The yearly configuration contains scene recipes for all simulated days, and this
+function extracts and rebuilds the scene for the requested day. It validates
+source files and scene geometry against the saved fingerprints to ensure
+consistency. No meteorology or simulation is executed.
+
+Return the rebuilt `scene` and its `config` for the specified day.
+"""
+function load_yearly_scene(; config_id, day, output_dir=_agripv_yearly_output_dir())
+    output_dir = abspath(output_dir)
+    filename = joinpath(output_dir, "scene_config_$(config_id).toml")
+    isfile(filename) || throw(ArgumentError(
+        "Yearly scene config not found: $filename. Use the daily loader for per-day TOML files.",
+    ))
+    metadata = TOML.parsefile(filename)
+    get(metadata, "format_version", nothing) == 1 || throw(ArgumentError("Unsupported scene recipe format."))
+    isequal(metadata["config_id"], config_id) ||
+        throw(ArgumentError("The saved recipe has a different configuration ID."))
+
+    day_str = string(day)
+    scenes_array = get(metadata, "scenes", nothing)
+    isnothing(scenes_array) && throw(ArgumentError(
+        "No scenes array found in yearly configuration file.",
+    ))
+
+    # Find the scene entry for the requested day
+    scene_entry = nothing
+    for entry in scenes_array
+        scene_recipe = get(entry, "scene", nothing)
+        isnothing(scene_recipe) && continue
+        entry_day = get(scene_recipe, "day", nothing)
+        isnothing(entry_day) && continue
+        entry_day == day_str && (scene_entry = entry; break)
+    end
+
+    isnothing(scene_entry) && throw(ArgumentError(
+        "No scene found for day $day in configuration $config_id."
+    ))
+
+    recipe = scene_entry["scene"]
+    scene_sha256 = scene_entry["scene_sha256"]
+
+    # Validate source files
+    source_paths = Dict{String,String}()
+    for source in ("obj", "mtg")
+        path = normpath(joinpath(_agripv_project_root(), recipe[source * "_path"]))
+        isfile(path) && _agripv_saved_file_sha256(path) == recipe[source * "_sha256"] ||
+            throw(ArgumentError("The saved plant $source source is missing or changed: $path"))
+        source_paths[source] = path
+    end
+
+    # Build the configuration
+    config = ConfigPV(; (Symbol(name) => value for (name, value) in recipe["config"])...)
+
+    # Rebuild the scene
+    scene = agripv_scene(;
+        c=config,
+        day=Date(recipe["day"]),
+        plant_density=recipe["plant_density"],
+        ground_res=recipe["ground_res"],
+        ground_nx=get(recipe, "ground_nx", round(Int, recipe["ground_res"] * config.panel_x_distance)),
+        ground_ny=get(recipe, "ground_ny", round(Int, recipe["ground_res"] * config.panel_y_distance)),
+        obj_path=source_paths["obj"],
+        mtg_path=source_paths["mtg"],
+        plant_rotations=recipe["plant_rotations_rad"]
+    )
+
+    # Verify fingerprint
+    agripv_scene_fingerprint(scene) == scene_sha256 || throw(ArgumentError(
+        "Rebuilt scene geometry or node IDs differ from the saved simulation scene."
+    ))
+
+    return (; scene, config, day=Date(recipe["day"]))
+end
