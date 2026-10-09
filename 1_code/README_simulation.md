@@ -1,5 +1,72 @@
 # Daily light and physiology simulation
 
+## DuckDB / Parquet output storage
+
+Daily and growth-period writers default to `storage=:parquet` with lossless
+**Zstandard level 19**. DuckDB writes bounded shards (122,880 rows by default),
+partitioned by date. There is no duplicate `.duckdb` database. Float64 values,
+missing values and timestamps are retained; each batch is checked after writing.
+Keep the TOML sidecar, Parquet shards and original OBJ/MTG inputs together.
+`storage=:csv` remains available for compatibility.
+
+`load_day_outputs` reads daily or period sidecars, accepts `tables`, `timestep`
+and `variables`, and rebuilds the matching scene. It rejects tables marked
+unavailable. For analysis across a period, use bounded batches or SQL:
+
+```julia
+include("1_code/parquet_output_io.jl")
+total = Ref(0.0)
+foreach_saved_output_batch(; config_id=2, table=:plants,
+    columns=(:assimilation_step,)) do batch
+    total[] += sum(skipmissing(batch.assimilation_step))
+end
+# This sum is in µmol CO₂; divide by 1e6 for mol CO₂.
+
+per_plant = with_saved_outputs(; config_id=2, tables=:plants) do con, metadata
+    DataFrame(DBInterface.execute(con, """
+        SELECT plant_instance_id, sum(assimilation_step) AS assimilation_umol_CO2
+        FROM plants GROUP BY plant_instance_id
+        """))
+end
+```
+
+Period runs save the actual prepared radiation forcing, including timestep
+seconds and incoming PAR. The faPAR reader uses this stored forcing when present
+and supports both Parquet and legacy plain/gzip CSV. The project pins DuckDB 1.5
+and CSV 0.10 to use their compatible parser dependencies.
+
+`year_simulation(seed=...)` generates seeded fresh rotations and retains them
+through the new growth cycle. It records the seed, Julia version and manifest
+hash. Without `seed`, normal scene generation uses Julia's default RNG.
+The yearly driver now sets explicit per-configuration seeds. Reproducibility
+requires unchanged code, inputs, package versions and thread count.
+
+The temporary missing-output runner and its instructions live in
+`2_outputs/overnight_scripts/`; they are intentionally excluded from Git.
+It reconstructs archived scene orientations and validates each day against
+retained results before publishing only missing tables into the yearly dataset.
+Existing tables are preserved. Partial tables are explicitly marked incomplete;
+full-cycle readers reject them until repair finishes. Including the runner defines
+functions only; it does not launch.
+
+## Cycle assimilation analysis
+
+`integrated_plant_assimilation` in `attach_assimilation_to_scene.jl` queries the
+Parquet plant summaries and sums signed `assimilation_step` over every retained
+timestep, grouped by stable `plant_instance_id`. Its `total_assimilation` is
+in mol CO₂/plant (the stored steps are µmol CO₂/plant). Plant steps already sum
+the area-integrated exchanges of all active leaf sections; do not sum daily
+cumulative values or average over days. `attach_assimilation_to_yearly_scene`
+attaches these totals to Plant nodes and their organs on verified saved geometry.
+
+The historical `5.8_integrate_year_radiations.jl` and
+`5.9_plot_integrated_light.jl` filenames contain assimilation analysis.
+The integration script writes a small derived CSV under
+`2_outputs/cumulative_assimilation/`; source Parquet remains untouched.
+`5.7_plot_year_cumulative_assimilation.jl` materializes three representative
+plant curves per configuration and the complete crop-total curve. DuckDB computes
+the full-cycle sums on disk, with chronological ordering and stable planting IDs.
+
 First, instantiate the project:
 
 ```julia
@@ -16,9 +83,10 @@ Pkg.instantiate()
     source tree. PlantSimEngine is unchanged. In a Kaimon session started for this project, a clean checkout can install the dependencies with:
 
 To make a daily simulation, run the script `4.2_run_day_simulation.jl`. It
-writes three CSV tables: `out_config_*` for green leaf sections,
-`light_config_*.csv.gz` for absorbed PAR on all geometric objects, and `plants_config_*` for plant
-summaries. These are wide tables: one row per object and publication timestep.
+writes three output tables under `config_ID_DATE/{leaves,light,plants}/day=DATE/`
+as Parquet shards: green leaf sections, absorbed PAR on all geometric objects,
+and plant summaries. Legacy CSV filenames are used only with `storage=:csv`.
+These are wide tables: one row per object and publication timestep.
 It also writes `scene_config_ID_DATE.toml` alongside them for scene reconstruction.
 All three include `node_id`, the exact node ID in the returned scene MTG,
 and `plant_id`, its nearest Plant ancestor's node ID. A Plant row uses its
@@ -213,7 +281,7 @@ The 51 focused tests passed through Kaimon with Julia 1.13.1, CSV 1.1.0 and
 ArchimedLight 0.2.0. They check area/duration integration, energy weighting,
 plant categories, missing dark ratios, batch equivalence and invalid inputs.
 
-## Reload CSVs and rebuild their scene
+## Reload outputs and rebuild their scene
 
 The daily loop calls `write_day_outputs(result; config_id=configID)`. This keeps
 leaf and plant CSV names, writes compact light as `.csv.gz`, and adds a small TOML sidecar. It records the

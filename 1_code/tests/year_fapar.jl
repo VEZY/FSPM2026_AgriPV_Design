@@ -95,7 +95,7 @@ const YEAR_FAPAR_TEST_RESULT = @testset "Yearly PAR capture uses energy and scen
         compressed_path = joinpath(directory, "light_config_$(CONFIG_ID).csv.gz")
         for day in DAYS
             chunk = _agripv_compact_light(filter(:day => ==(day), compact))
-            CSV.write(compressed_path, chunk; compress=:gzip, append=isfile(compressed_path))
+            CSV.write(compressed_path, chunk; compress=true, append=isfile(compressed_path))
         end
         compact_metadata = TOML.parsefile(joinpath(directory, "scene_config_$(CONFIG_ID).toml"))
         compact_metadata["tables"]["light"]["file"] = basename(compressed_path)

@@ -1,5 +1,6 @@
 using CSV, DataFrames, Dates, SHA, TOML
 using MultiScaleTreeGraph, PlantGeom, GeometryBasics
+isdefined(@__MODULE__, :_agripv_write_parquet) || include("parquet_output_io.jl")
 
 isdefined(@__MODULE__, :_agripv_compact_light) || include("light_output_io.jl")
 
@@ -47,7 +48,7 @@ the original scene later with `load_day_outputs`, without rerunning physics.
 `compact_light=false` preserves the legacy full, uncompressed light export.
 The result must use this version of `agripv_scene`, which records its recipe.
 """
-function write_day_outputs(result; config_id, output_dir=_agripv_daily_output_dir(), compact_light=true)
+function _write_day_outputs_csv(result; config_id, output_dir=_agripv_daily_output_dir(), compact_light=true)
     recipe = result.scene.mtg[:agripv_scene_recipe]
     isnothing(recipe) && throw(ArgumentError(
         "This scene has no saved construction recipe. Generate it with the updated agripv_scene before exporting.",
@@ -76,7 +77,7 @@ function write_day_outputs(result; config_id, output_dir=_agripv_daily_output_di
         ncol(table) == 0 && continue
         path = getproperty(paths, name)
         if name == :light && compact_light
-            CSV.write(path, _agripv_compact_light(table); compress=:gzip)
+            CSV.write(path, _agripv_compact_light(table); compress=true)
         else
             CSV.write(path, table)
         end
@@ -130,30 +131,35 @@ end
 """
     load_day_outputs(; config_id, day, output_dir=..., tables=(:leaves, :plants, :light))
 
-Read saved CSVs and rebuild their original scene from its TOML recipe.
+Read saved Parquet/CSV tables and rebuild their original scene from its TOML recipe.
 Replays plant rotations and the saved configuration values, independently of
 the current DOE file and RNG. Checks source files, scene geometry, CSV hashes
 and node metadata before returning. No meteorology or simulation is executed.
 Return `scene`, `leaves`, `plants`, `light`, `config`, `day` and `metadata`.
-Use `tables=(:leaves,)` when only that CSV is needed; other tables are empty.
+Use `tables=(:leaves,)` to read just leaf outputs; other tables are empty.
+Parquet readers also accept `timestep` and `variables` for selective snapshots.
 Earlier format-version-1 tables without `plant_instance_id` remain readable.
 When present, that column is also checked against each node's Plant ancestor.
 """
 function load_day_outputs(; config_id, day, output_dir=_agripv_daily_output_dir(),
-    tables=(:leaves, :plants, :light))
+    tables=(:leaves, :plants, :light), timestep=nothing, variables=nothing, verify_hash=true)
     tables = tables isa Symbol ? (tables,) : Tuple(tables)
     all(name -> name in (:leaves, :plants, :light), tables) ||
         throw(ArgumentError("Select leaves, plants and/or light tables."))
     output_dir = abspath(output_dir)
     filename = joinpath(output_dir, "scene_config_$(config_id)_$(day).toml")
+    if !isfile(filename)
+        filename = joinpath(output_dir, "scene_config_$(config_id).toml")
+    end
     isfile(filename) || throw(ArgumentError(
         "Scene recipe not found: $filename. CSVs alone cannot recover random plant rotations; export with write_day_outputs.",
     ))
     metadata = TOML.parsefile(filename)
-    get(metadata, "format_version", nothing) == 1 || throw(ArgumentError("Unsupported scene recipe format."))
-    isequal(metadata["config_id"], config_id) && metadata["scene"]["day"] == string(day) ||
+    get(metadata, "format_version", nothing) in (1, 2) || throw(ArgumentError("Unsupported scene recipe format."))
+    entry = haskey(metadata, "scene") ? metadata : only(filter(x -> x["scene"]["day"] == string(day), metadata["scenes"]))
+    isequal(metadata["config_id"], config_id) && entry["scene"]["day"] == string(day) ||
         throw(ArgumentError("The saved recipe has a different configuration ID or date."))
-    recipe = metadata["scene"]
+    recipe = entry["scene"]
     source_paths = Dict{String,String}()
     for source in ("obj", "mtg")
         path = normpath(joinpath(_agripv_project_root(), recipe[source * "_path"]))
@@ -168,20 +174,26 @@ function load_day_outputs(; config_id, day, output_dir=_agripv_daily_output_dir(
         ground_ny=get(recipe, "ground_ny", round(Int, recipe["ground_res"] * config.panel_y_distance)),
         obj_path=source_paths["obj"], mtg_path=source_paths["mtg"],
         plant_rotations=recipe["plant_rotations_rad"])
-    agripv_scene_fingerprint(scene) == metadata["scene_sha256"] || throw(ArgumentError(
+    agripv_scene_fingerprint(scene) == entry["scene_sha256"] || throw(ArgumentError(
         "Rebuilt scene geometry or node IDs differ from the saved simulation scene.",
     ))
     loaded = Dict(name => DataFrame() for name in (:leaves, :plants, :light))
     for name in tables
         info = get(metadata["tables"], string(name), nothing)
         isnothing(info) && continue # The run did not retain this table.
-        path = joinpath(output_dir, info["file"])
-        isfile(path) && _agripv_saved_file_sha256(path) == info["sha256"] ||
-            throw(ArgumentError("The saved $name CSV is missing or changed: $path"))
-        table = _agripv_open_light(path) do io
-            CSV.read(io, DataFrame)
+        get(info, "available", true) || throw(ArgumentError("Saved $name outputs are marked unavailable."))
+        table = if haskey(info, "files")
+            _agripv_read_parquet(output_dir, info; day, timestep, variables, verify_hash)
+        else
+            path = joinpath(output_dir, info["file"])
+            isfile(path) && (!verify_hash || _agripv_saved_file_sha256(path) == info["sha256"]) ||
+                throw(ArgumentError("The saved $name CSV is missing or changed: $path"))
+            _agripv_open_light(path) do io
+                CSV.read(io, DataFrame)
+            end
         end
         name == :light && _agripv_restore_light_timestep!(table, recipe["day"])
+        !isnothing(timestep) && (table = filter(:timestep => ==(timestep), table))
         loaded[name] = _validate_saved_output_table!(table, scene)
     end
     return (; scene, leaves=loaded[:leaves], plants=loaded[:plants], light=loaded[:light],
@@ -208,7 +220,7 @@ function load_yearly_scene(; config_id, day, output_dir=_agripv_yearly_output_di
         "Yearly scene config not found: $filename. Use the daily loader for per-day TOML files.",
     ))
     metadata = TOML.parsefile(filename)
-    get(metadata, "format_version", nothing) == 1 || throw(ArgumentError("Unsupported scene recipe format."))
+    get(metadata, "format_version", nothing) in (1, 2) || throw(ArgumentError("Unsupported scene recipe format."))
     isequal(metadata["config_id"], config_id) ||
         throw(ArgumentError("The saved recipe has a different configuration ID."))
 
@@ -266,4 +278,76 @@ function load_yearly_scene(; config_id, day, output_dir=_agripv_yearly_output_di
     ))
 
     return (; scene, config, day=Date(recipe["day"]))
+end
+
+
+function _agripv_day_parquet_data!(result; config_id, root, dataset,
+    tables=(:leaves, :plants, :light), compact_light=true, compression_level=19, batch_rows=122880)
+    recipe = deepcopy(result.scene.mtg[:agripv_scene_recipe])
+    isnothing(recipe) && throw(ArgumentError("Scene has no saved construction recipe."))
+    for family in ("obj", "mtg")
+        path = recipe[family * "_path"]
+        _agripv_saved_file_sha256(path) == recipe[family * "_sha256"] || throw(ArgumentError("Geometry source changed: $path"))
+        recipe[family * "_path"] = relpath(path, _agripv_project_root())
+    end
+    day = Date(recipe["day"])
+    saved_tables = Dict{String,Any}()
+    for role in tables
+        role in (:leaves, :plants, :light) || throw(ArgumentError("Unknown output table $role."))
+        source = getproperty(result, role)
+        ncol(source) == 0 && continue
+        table = DataFrame(role == :light && compact_light ? _agripv_compact_light(source) : source; copycols=false)
+        # Keep date and configuration explicit in the new schema.
+        table.day = fill(day, nrow(table))
+        table.config_id = fill(config_id, nrow(table))
+        directory = joinpath(root, dataset, string(role), "day=$day")
+        entries = _agripv_write_parquet(table, directory; day, compression_level, batch_rows)
+        for item in entries
+            item["file"] = relpath(joinpath(directory, item["file"]), root)
+        end
+        saved_tables[string(role)] = _agripv_parquet_info(entries; compression_level)
+    end
+    metadata = Dict("format_version" => 2, "storage" => "parquet", "config_id" => config_id,
+        "scene" => recipe, "scene_sha256" => agripv_scene_fingerprint(result.scene), "tables" => saved_tables)
+    if hasproperty(result, :meteo)
+        forcing = DataFrame(date=DateTime[row.date for row in result.meteo],
+            duration=Float64[row.duration isa Real ? row.duration : Dates.toms(row.duration)/1000 for row in result.meteo],
+            Ri_PAR_f=Float64[row.Ri_PAR_f for row in result.meteo])
+        directory = joinpath(root, dataset, "forcing", "day=$day")
+        entries = _agripv_write_parquet(forcing, directory; day, compression_level, batch_rows)
+        for item in entries
+            item["file"] = relpath(joinpath(directory, item["file"]), root)
+        end
+        metadata["forcing"] = _agripv_parquet_info(entries; compression_level)
+        metadata["forcing_origin"] = "simulation"
+        metadata["forcing_provenance"] = "actual prepared forcing; duration seconds; Ri_PAR_f W m^-2"
+    end
+    return metadata
+end
+
+"""Write lossless Parquet/Zstandard-19 by default; storage=:csv retains legacy exports."""
+function write_day_outputs(result; config_id, output_dir=_agripv_daily_output_dir(),
+    storage=:parquet, tables=(:leaves, :plants, :light), compact_light=true,
+    compression_level=19, batch_rows=122880, provenance=Dict{String,Any}())
+    storage in (:parquet, :csv) || throw(ArgumentError("storage must be :parquet or :csv."))
+    storage == :csv && return _write_day_outputs_csv(result; config_id, output_dir, compact_light)
+    output_dir = abspath(output_dir)
+    mkpath(output_dir)
+    day = result.scene.mtg[:agripv_scene_recipe]["day"]
+    dataset = "config_$(config_id)_$day"
+    metadata_file = "scene_config_$(config_id)_$day.toml"
+    metadata = mktempdir(output_dir; prefix=".parquet_") do staging
+        mkpath(joinpath(staging, dataset))
+        data = _agripv_day_parquet_data!(result; config_id, root=staging, dataset,
+            tables, compact_light, compression_level, batch_rows)
+        isempty(provenance) || (data["reproducibility"] = provenance)
+        open(joinpath(staging, metadata_file), "w") do io
+            TOML.print(io, data)
+        end
+        _agripv_publish_dataset(staging, output_dir, dataset, metadata_file)
+        data
+    end
+    paths = (; (role => (haskey(metadata["tables"], string(role)) ? joinpath(output_dir, dataset, string(role)) : nothing)
+        for role in (:leaves, :plants, :light))...)
+    return merge(paths, (; metadata=joinpath(output_dir, metadata_file)))
 end

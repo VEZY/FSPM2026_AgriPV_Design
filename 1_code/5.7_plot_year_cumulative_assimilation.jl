@@ -6,30 +6,35 @@ using Statistics, DataFramesMeta
 
 meteo = CSV.read("0_simulations/meteo/meteo_data_2025_montpellier.csv", DataFrame)
 
-sources = glob("2_outputs/simulations/yearly/plants_*.csv")
-regex = r"plants_config_(\d+)"
-configIDs = []
-dates = []
-for src in sources
-    m = match(regex, src)
-    push!(configIDs, parse(Int, m.captures[1]))
+isdefined(@__MODULE__, :with_saved_outputs) || include("parquet_output_io.jl")
+# Query the complete cycle in DuckDB. Materialize only three plants per config
+# for individual curves, plus one crop-total value per timestamp.
+configIDs = collect(0:3)
+individual = DataFrame[]
+whole_crop = DataFrame[]
+for config_id in configIDs
+    with_saved_outputs(; config_id, tables=:plants) do con, metadata
+        push!(individual, DataFrame(DBInterface.execute(con, """
+            SELECT $config_id AS configID, plant_instance_id, datetime,
+                sum(assimilation_step) OVER (
+                    PARTITION BY plant_instance_id ORDER BY datetime
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS assimilation_cumulative
+            FROM plants WHERE plant_instance_id IN (
+                SELECT DISTINCT plant_instance_id FROM plants
+                WHERE plant_instance_id IS NOT NULL ORDER BY plant_instance_id LIMIT 3)
+            ORDER BY plant_instance_id, datetime
+            """)))
+        push!(whole_crop, DataFrame(DBInterface.execute(con, """
+            SELECT $config_id AS configID, datetime,
+                sum(step_sum) OVER (ORDER BY datetime
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS assimilation_cumulative_sum
+            FROM (SELECT datetime, sum(assimilation_step) AS step_sum
+                  FROM plants GROUP BY datetime) ORDER BY datetime
+            """)))
+    end
 end
-df = CSV.read(sources, DataFrame; source=:configID => configIDs)
-sort!(df, :plant_id)
-n_unique_plant_ids = length(unique(df.plant_id))
-println("Number of different plant_id: ", n_unique_plant_ids)
-
-# Transform the cumulative assimilation to be on the year period, per plant per config
-df = @chain df begin
-    groupby([:configID, :plant_id])
-    @transform :assimilation_cumulative = cumsum(:assimilation_step)
-end
-
-# Compute mean per configID and datetime
-df_sum = @chain df begin
-    groupby([:configID, :datetime])
-    @combine :assimilation_cumulative_sum = sum(coalesce.(:assimilation_cumulative, 0.0))
-end
+df = vcat(individual...)
+df_sum = vcat(whole_crop...)
 
 # ax = Axis(f[1, 1], title="Config")
 # for configID in configIDs
@@ -50,15 +55,7 @@ end
 #     draw!(ax, aPPFD)
 # end
     
-selected_day = Date(2025, 7, 2) # Change this to the day you want to display
-day_start = DateTime(selected_day)
-day_end = DateTime(selected_day + Day(1))
-df_day = filter(:datetime => x -> day_start <= DateTime(x) < day_end, df)
-df_day_plant = filter(:plant_id => ==(3), df_day)
-
-unique_plant_ids = unique(df.plant_instance_id)
-id = [1, 2, 1034]
-selected_plant_ids = [unique_plant_ids[x] for x in id]
+selected_plant_ids = unique(filter(:configID => ==(0), df).plant_instance_id)
 
 begin
     f1 = Figure(size=(900, 700))
@@ -84,7 +81,7 @@ begin
 end
 
 
-# One graph per config, with cumulative assimilation per plants, for the whole year
+# Three representative planting positions per config, integrated over the whole cycle
 begin
     f1 = Figure(size=(900, 700))#, title="Absorbed PAR for each config over a day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)")
 
@@ -101,8 +98,8 @@ begin
             mapping(
                 :datetime => (x -> DateTime(x)) => "Time",
                 # :timestep => "Timestep",
-                :assimilation_cumulative => "Cumulative assimilation per plant",
-                group = :plant_id
+                :assimilation_cumulative => "Cumulative assimilation (μmol CO₂/plant)",
+                group = :plant_instance_id
             ) *
             visual(Lines, alpha=0.05)
 
@@ -114,15 +111,15 @@ save("2_outputs/year_cumulative_assimilation_per_plant.png", f1, update=false, p
 
 
 
-# ALL mean assimilation per configs together, with meteo overlay, for the whole year
+# Whole-crop sums, with weather in a separate panel because the units differ
 begin
-    f2 = Figure(size=(900, 700))
+    f2 = Figure(size=(900, 900))
 
     assim_cumul_sum =
         data(df_sum) *
         mapping(
             :datetime => (x -> DateTime(x)) => "Time",
-            :assimilation_cumulative_sum => "Cumulative assimilation over the day (μmol)",
+            :assimilation_cumulative_sum => "Growth-cycle cumulative assimilation (μmol CO₂)",
             color = :configID => (x -> "Config " * string(x)) => "PV configurations",
             group = :configID
         ) *
@@ -144,11 +141,11 @@ begin
         data(meteo_relative_humidity) *
         mapping(
             :datetime => "Time",
-            :relative_humidity => "Relative Humidity (%)"
+            :relative_humidity => "Relative humidity (fraction)"
         ) *
         visual(Lines, linewidth=1.5)
 
-    draw!(f2[1,1], meteo_overlay)
+    draw!(f2[2,1], meteo_overlay)
     # axislegend(f2[1,1]; position=:rt)
     f2
 end

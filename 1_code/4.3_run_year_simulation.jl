@@ -21,7 +21,8 @@ meteo = get_meteo(days)
 
 for configID in configIDs
     summary = year_simulation(; pvconfig=get_pvconfig(configID), config_id=configID,
-        plant_dir, plant_pattern, meteo, scene_kwargs)
+        plant_dir, plant_pattern, meteo, scene_kwargs, storage=:parquet,
+        compression_level=19, seed=20261009 + 1_000_003 * configID)
     @info "Growth-period outputs saved" configID days=length(summary.days) paths=summary.paths
 end
 println(now(), " Finished running year simulations for all configurations.")

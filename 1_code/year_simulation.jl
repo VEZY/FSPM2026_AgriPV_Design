@@ -1,4 +1,4 @@
-using Dates, CSV, DataFrames, TOML
+using Dates, CSV, DataFrames, TOML, Random
 using PlantMeteo, TableOperations, PlantMeteo.Tables
 
 isdefined(@__MODULE__, :day_simulation) || include("simulation.jl")
@@ -57,7 +57,7 @@ The TOML sidecar stores each scene recipe and fingerprint. Files are published
 after all daily simulations succeed; a simulation failure preserves prior outputs.
 Return output paths, simulated dates and row counts, rather than all tables.
 """
-function year_simulation(; pvconfig, config_id,
+function _year_simulation_csv(; pvconfig, config_id,
     plant_dir=joinpath(_agripv_project_root(), "2_outputs", "archicrop"),
     plant_pattern="*.obj", days=nothing, meteo=nothing,
     keep_leaves=true, keep_light=true, compact_light=true, scene_kwargs=NamedTuple(),
@@ -114,7 +114,7 @@ function year_simulation(; pvconfig, config_id,
                 ncol(table) == 0 && continue
                 path = joinpath(staging, getproperty(filenames, name))
                 if name == :light && compact_light
-                    CSV.write(path, _agripv_compact_light(table); compress=:gzip, append=isfile(path))
+                    CSV.write(path, _agripv_compact_light(table); compress=true, append=isfile(path))
                 else
                     table.day = fill(source.day, nrow(table))
                     table.config_id = fill(config_id, nrow(table))
@@ -161,4 +161,81 @@ function year_simulation(; pvconfig, config_id,
         joinpath(output_dir, getproperty(filenames, name)) : nothing)
         for name in (:leaves, :plants, :light, :metadata))...)
     return (; paths, days=dates, rows=(; counts...))
+end
+
+
+"""Stream each day to partitioned Parquet/Zstandard-19, retaining one day's outputs."""
+function year_simulation(; storage=:parquet, kwargs...)
+    storage == :csv && return _year_simulation_csv(; kwargs...)
+    storage == :parquet || throw(ArgumentError("storage must be :parquet or :csv."))
+    return _year_simulation_parquet(; kwargs...)
+end
+
+function _year_simulation_parquet(; pvconfig, config_id,
+    plant_dir=joinpath(_agripv_project_root(), "2_outputs", "archicrop"), plant_pattern="*.obj",
+    days=nothing, meteo=nothing, keep_leaves=true, keep_light=true, compact_light=true,
+    tables=(:leaves, :plants, :light), mode=:coupled, seed=nothing, scene_kwargs=NamedTuple(),
+    compression_level=19, batch_rows=122880,
+    output_dir=joinpath(_agripv_project_root(), "2_outputs", "simulations", "yearly"))
+    mode in (:coupled, :light) || throw(ArgumentError("mode must be :coupled or :light."))
+    !isnothing(seed) && haskey(scene_kwargs, :plant_rotations) && throw(ArgumentError("Supply a seed or explicit rotations, not both."))
+    sources = plant_simulation_days(; plant_dir, plant_pattern)
+    selected = isnothing(days) ? Set(getproperty.(sources, :day)) : Set(Date.(days))
+    isempty(selected) && throw(ArgumentError("Select at least one date."))
+    isempty(setdiff(selected, Set(getproperty.(sources, :day)))) || throw(ArgumentError("Missing plant maquettes."))
+    filter!(x -> x.day in selected, sources)
+    dates = getproperty.(sources, :day)
+    meteo = isnothing(meteo) ? get_meteo(dates) : meteo
+    isempty(setdiff(selected, Set(Date(row.date) for row in meteo))) || throw(ArgumentError("Missing meteorology."))
+    rng = isnothing(seed) ? Random.default_rng() : Random.MersenneTwister(seed)
+    rotations = get(scene_kwargs, :plant_rotations, nothing)
+    metadata_file, dataset = "scene_config_$(config_id).toml", "config_$(config_id)"
+    output_dir = abspath(output_dir); mkpath(output_dir)
+    counts = Dict(role => 0 for role in (:leaves, :plants, :light))
+    metadata = mktempdir(output_dir; prefix=".config_$(config_id)_") do staging
+        mkpath(joinpath(staging, dataset))
+        scenes = Dict{String,Any}[]
+        files = Dict{String,Any}()
+        forcing_files = Dict{String,Any}[]
+        for source in sources
+            @info "Simulating growth period" config_id day=source.day mode
+            !isnothing(seed) && Random.seed!(seed + Dates.value(source.day))
+            daily = TableOperations.filter(row -> Date(Tables.getcolumn(row, :date)) == source.day, meteo) |>
+                rows -> TimeStepTable(rows, PlantMeteo.metadata(meteo))
+            scene_options = merge(scene_kwargs, (; obj_path=source.obj_path, mtg_path=source.mtg_path,
+                plant_rotations=rotations, rng))
+            result = mode == :light ? light_day_simulation(; pvconfig, day=source.day, meteo=daily, scene_kwargs=scene_options) :
+                day_simulation(; pvconfig, day=source.day, meteo=daily, keep_leaves, keep_light, scene_kwargs=scene_options)
+            data = _agripv_day_parquet_data!(result; config_id, root=staging, dataset, tables,
+                compact_light, compression_level, batch_rows)
+            rotations = data["scene"]["plant_rotations_rad"]
+            push!(scenes, Dict("scene" => data["scene"], "scene_sha256" => data["scene_sha256"]))
+            for (role, info) in data["tables"]
+                append!(get!(files, role, Dict{String,Any}[]), info["files"])
+                counts[Symbol(role)] += info["rows"]
+            end
+            append!(forcing_files, data["forcing"]["files"])
+            result = nothing
+        end
+        data = Dict("format_version" => 2, "storage" => "parquet", "simulation" => "growth_period",
+            "config_id" => config_id, "days" => string.(dates), "identity_scope" => "day",
+            "cumulative_scope" => "day", "plant_instance_identity_scope" => "configuration",
+            "scenes" => scenes, "tables" => Dict(role => _agripv_parquet_info(entries; compression_level) for (role, entries) in files),
+            "forcing" => _agripv_parquet_info(forcing_files; compression_level), "forcing_origin" => "simulation",
+            "forcing_provenance" => "actual prepared forcing; duration seconds; Ri_PAR_f W m^-2")
+        if !isnothing(seed)
+            data["reproducibility"] = Dict("seed" => seed, "rotation_rng" => "MersenneTwister",
+                "daily_global_seed" => "seed + Dates.value(day)", "julia_version" => string(VERSION),
+                "archived_rotations_reused" => false,
+                "manifest_sha256" => _agripv_hash(joinpath(_agripv_project_root(), "Manifest.toml")))
+        end
+        open(joinpath(staging, metadata_file), "w") do io
+            TOML.print(io, data)
+        end
+        _agripv_publish_dataset(staging, output_dir, dataset, metadata_file)
+        data
+    end
+    paths = (; (role => (haskey(metadata["tables"], string(role)) ? joinpath(output_dir, dataset, string(role)) : nothing)
+        for role in (:leaves, :plants, :light))...)
+    return (; paths=merge(paths, (; metadata=joinpath(output_dir, metadata_file))), days=dates, rows=(; counts...))
 end

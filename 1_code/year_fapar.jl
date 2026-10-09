@@ -52,7 +52,8 @@ end
     summarize_year_fapar(; config_id, input_dir=..., batch_bytes=32*1024^2,
         forcing=nothing, verify_hash=true)
 
-Read compact `.csv.gz` or legacy `.csv` light results in bounded byte batches.
+Read Parquet shards in bounded row batches, or compact/legacy light CSV in
+bounded byte batches.
 Gzip is decompressed as a stream, including appended daily gzip members.
 Require its `scene_config_ID.toml` sidecar. Return small `hourly` and `daily`
 DataFrames, plus row count and source SHA256. No full-file read or memory map
@@ -84,7 +85,9 @@ function summarize_year_fapar(; config_id,
         throw(ArgumentError("Expected growth-period metadata for configuration $config_id."))
     light_info = get(metadata["tables"], "light", nothing)
     isnothing(light_info) && throw(ArgumentError("This simulation did not retain light outputs."))
-    path = joinpath(input_dir, light_info["file"])
+    get(light_info, "available", true) || throw(ArgumentError("Light outputs are marked unavailable."))
+    parquet = haskey(light_info, "files")
+    path = parquet ? nothing : joinpath(input_dir, light_info["file"])
     areas = Dict{Date,Float64}()
     for entry in metadata["scenes"]
         recipe = entry["scene"]
@@ -96,7 +99,8 @@ function summarize_year_fapar(; config_id,
         areas[day] = surface
     end
     Set(keys(areas)) == Set(Date.(metadata["days"])) || throw(ArgumentError("Saved scene dates differ from period dates."))
-    forcing = isnothing(forcing) ? _year_fapar_forcing(metadata) : forcing
+    forcing = isnothing(forcing) ? (haskey(metadata, "forcing") ?
+        _agripv_read_parquet(input_dir, metadata["forcing"]; verify_hash) : _year_fapar_forcing(metadata)) : forcing
     rows = sort!(collect(Tables.rows(forcing)); by=row -> DateTime(row.date))
     isempty(rows) && throw(ArgumentError("Incoming forcing is empty."))
     stamps = DateTime[row.date for row in rows]
@@ -126,6 +130,17 @@ function summarize_year_fapar(; config_id,
     required = [:datetime, :plant_id, :scale, :Ra_PAR_f, :area]
     nrows = 0
     last_report = time()
+    if parquet
+        foreach_saved_output_batch(; config_id, table=:light, input_dir, verify_hash) do table
+            columns = propertynames(table)
+            _fapar_accumulate!(absorbed, counts, lookup, expected_steps, config_id,
+                table.datetime, :day in columns ? table.day : nothing,
+                :timestep in columns ? table.timestep : nothing,
+                :config_id in columns ? table.config_id : nothing,
+                table.plant_id, table.scale, table.Ra_PAR_f, table.area)
+            nrows += nrow(table)
+        end
+    else
     _agripv_open_light(path) do io
         header = readline(io; keep=true)
         names = Symbol.(split(chomp(header), ','))
@@ -153,8 +168,9 @@ function summarize_year_fapar(; config_id,
             end
         end
     end
-    source_sha256 = bytes2hex(open(SHA.sha256, path))
-    verify_hash && source_sha256 != light_info["sha256"] && throw(ArgumentError("Light CSV hash differs from the saved simulation."))
+    end
+    source_sha256 = parquet ? bytes2hex(SHA.sha256(join(x["sha256"] for x in light_info["files"]))) : bytes2hex(open(SHA.sha256, path))
+    !parquet && verify_hash && source_sha256 != light_info["sha256"] && throw(ArgumentError("Light CSV hash differs from the saved simulation."))
     nrows == light_info["rows"] || throw(ArgumentError("Light CSV row count differs from its saved metadata."))
     all(>(0), vec(sum(counts; dims=1))) || throw(ArgumentError("Some forcing timesteps have no light rows."))
     hourly = DataFrame(config_id=fill(config_id, length(stamps)), day=Date.(stamps),
