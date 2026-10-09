@@ -45,7 +45,8 @@ begin
         size=(900, 700),
         title = "Assimilation per plant per step for each config over a day",
         subtitle = """
-            For the day July 2, 2025, with a plant density of 60 plants m⁻².""",
+            For the day July 2, 2025, with a plant density of 60 plants m⁻² and a GCR¹ of 40%.""",
+        footnotes = ["¹Ground Coverage Ratio (GCR) is the ratio of the area covered by solar panels to the total ground area."],
     )
 
     aPPFD =
@@ -66,7 +67,9 @@ begin
         ) *
         visual(Lines, color=:red, linewidth=2, label = "Mean", legend = (; linewidth = 2))
 
-    fig = draw(aPPFD; figure = figure_options)
+    grid = draw(aPPFD; figure = figure_options, legend = (; visible = false))
+    # axislegend(grid.grid[1, 1].axis, position = :lt)
+    # grid.figure
 end
 
-save("2_outputs/day_step_assimilation_per_config.png", fig, update=false, px_per_unit=3.0)
+save("2_outputs/day_step_assimilation_per_config.png", grid, update=false, px_per_unit=3.0)

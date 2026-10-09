@@ -55,27 +55,65 @@ day_start = DateTime(selected_day)
 day_end = DateTime(selected_day + Day(1))
 df_day = filter(:datetime => x -> day_start <= DateTime(x) < day_end, df)
 df_day_plant = filter(:plant_id => ==(3), df_day)
-df_plant = filter(:plant_id => ==(59391), df)
+unique_plant_ids = unique(df.plant_id)
+id = [1, 2, 1034, 4075]
+selected_plant_ids = [unique_plant_ids[x] for x in id]
 
+begin
+    f1 = Figure(size=(900, 700))
+    ax = Axis(
+        f1[1, 1],
+        xlabel = "Time",
+        ylabel = "Cumulative assimilation per plant",
+        title = "Selected plants, Config 0"
+    )
+
+    for plantID in selected_plant_ids
+        df_plant = filter(row -> row.plant_id == plantID && row.configID == 0, df)
+        lines!(
+            ax,
+            DateTime.(df_plant.datetime),
+            df_plant.assimilation_cumulative;
+            label = "Plant $plantID"
+        )
+    end
+
+    axislegend(ax; position = :rt)
+    f1
+end
+
+
+# One graph per config, with cumulative assimilation per plants, for the whole year
 begin
     f1 = Figure(size=(900, 700))#, title="Absorbed PAR for each config over a day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)")
 
-    aPPFD =
-        data(df_plant) *
-        mapping(
-            :datetime => (x -> DateTime(x)) => "Time",
-            # :timestep => "Timestep",
-            :assimilation_cumulative => "Cumulative assimilation per plant",
-            group = :plant_id,
-            layout = :configID
-        ) *
-        visual(Lines, alpha=0.5)
+    df_0 = filter(:configID => ==(0), df)
+    df_1 = filter(:configID => ==(1), df)
+    df_2 = filter(:configID => ==(2), df)
+    df_3 = filter(:configID => ==(3), df)
 
-    draw!(f1, aPPFD)
+    for (i, (configID, config_df)) in enumerate((0 => df_0, 1 => df_1, 2 => df_2, 3 => df_3))
+        row = (i - 1) ÷ 2 + 1
+        col = (i - 1) % 2 + 1
+        aPPFD =
+            data(config_df) *
+            mapping(
+                :datetime => (x -> DateTime(x)) => "Time",
+                # :timestep => "Timestep",
+                :assimilation_cumulative => "Cumulative assimilation per plant",
+                group = :plant_id
+            ) *
+            visual(Lines, alpha=0.05)
+
+        draw!(f1[row, col], aPPFD; axis=(title="Config $configID",))
+    end
     f1
 end
 save("2_outputs/year_cumulative_assimilation_per_plant.png", f1, update=false, px_per_unit=3.0)
 
+
+
+# ALL mean assimilation per configs together, with meteo overlay, for the whole year
 begin
     f2 = Figure(size=(900, 700))
 
