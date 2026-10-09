@@ -38,7 +38,12 @@ and CSV 0.10 to use their compatible parser dependencies.
 `year_simulation(seed=...)` generates seeded fresh rotations and retains them
 through the new growth cycle. It records the seed, Julia version and manifest
 hash. Without `seed`, normal scene generation uses Julia's default RNG.
-The yearly driver now sets explicit per-configuration seeds. Reproducibility
+Both production drivers use one common `seed = 1234` for every configuration.
+The daily driver resets that seed before each scene; the yearly driver passes
+the same seed to each period run. Matching planting layouts therefore receive
+the same plant rotations, retained throughout each new growth cycle. Change the
+single `seed` line in a driver to choose another common seed. The temporary repair
+runner continues to replay archived orientations. Reproducibility
 requires unchanged code, inputs, package versions and thread count.
 
 The temporary missing-output runner and its instructions live in
