@@ -61,11 +61,13 @@ simulated canopy.
 Only the simulated cell has a bounding box. Copy spacing comes from the exact
 `scene.scene_xy_bounds` periods; axes remain in local scene coordinates, while
 titles give the saved scene rotation. Every 3D plotting path uses the same
-geographic northeast viewpoint and marks geographic north with an arrow.
+geographic southwest viewpoint and marks geographic south with an arrow pointing
+toward the lower right. Translucent copies remain behind the simulated cell,
+on the upper side of the image, with offsets derived from the camera direction.
 ArchimedLight rotates sky directions into the unchanged local mesh coordinates:
-for a saved rotation θ, local north is `(sin(θ), cos(θ), 0)` and the camera's
-local azimuth is `45° − θ`. Thus north is −local y for configurations 0/2
-(180°) and +local x for configurations 1/3 (90°). The reusable
+for a saved rotation θ, local north is `(sin(θ), cos(θ), 0)`, south is its
+opposite, and the camera's local azimuth is `225° − θ`. Thus south is +local y
+for configurations 0/2 (180°) and −local x for configurations 1/3 (90°). The reusable
 `scene_orientation.jl` applies this convention to configuration views, daily
 snapshots, and cumulative 3D maps.
 

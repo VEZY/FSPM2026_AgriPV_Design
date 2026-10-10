@@ -1,7 +1,7 @@
 using GLMakie, GeometryBasics, Colors, Dates, TOML
 using PlantGeom, MultiScaleTreeGraph
 isdefined(@__MODULE__, :load_yearly_scene) || include("saved_simulation.jl")
-isdefined(@__MODULE__, :agripv_north_arrow!) || include("scene_orientation.jl")
+isdefined(@__MODULE__, :agripv_cardinal_arrow!) || include("scene_orientation.jl")
 
 function _configuration_saved_day(config_ids, output_dir, day)
     days = nothing
@@ -79,7 +79,8 @@ function _configuration_offsets(prepared; repeats=(2, 2))
     nx isa Integer && ny isa Integer && nx > 0 && ny > 0 ||
         throw(ArgumentError("repeats must contain two positive integer tile counts."))
     azimuth = agripv_local_camera_azimuth(prepared.rotation)
-    # Put the opaque simulation cell in the foreground for either orientation.
+    # Put copies behind the opaque cell for the selected geographic view.
+    # Changing the camera by 180° reverses these offsets, keeping copies above.
     xdirection = cos(azimuth) >= 0 ? -1 : 1
     ydirection = sin(azimuth) >= 0 ? -1 : 1
     xmin, ymin, xmax, ymax = prepared.domain
@@ -153,15 +154,15 @@ function _configuration_axis!(position, prepared; repeats=(2, 2), repeat_alpha=0
         translate!(p, dx, dy, 0)
     end
     box = _configuration_box!(ax, prepared; fontsize)
-    north = agripv_north_arrow!(ax, prepared.domain, prepared.rotation; fontsize)
+    compass = agripv_cardinal_arrow!(ax, prepared.domain, prepared.rotation; fontsize)
     xoffsets, yoffsets = first.(offsets), last.(offsets)
     xbounds, ybounds, zbounds = prepared.bounds
-    xlims = (min(xbounds[1] + minimum(xoffsets), north.bounds[1][1], box.bounds[1][1]),
-        max(xbounds[2] + maximum(xoffsets), north.bounds[1][2], box.bounds[1][2]))
-    ylims = (min(ybounds[1] + minimum(yoffsets), north.bounds[2][1], box.bounds[2][1]),
-        max(ybounds[2] + maximum(yoffsets), north.bounds[2][2], box.bounds[2][2]))
-    zlims = (min(zbounds[1], north.bounds[3][1], box.bounds[3][1]),
-        max(zbounds[2], north.bounds[3][2], box.bounds[3][2]))
+    xlims = (min(xbounds[1] + minimum(xoffsets), compass.bounds[1][1], box.bounds[1][1]),
+        max(xbounds[2] + maximum(xoffsets), compass.bounds[1][2], box.bounds[1][2]))
+    ylims = (min(ybounds[1] + minimum(yoffsets), compass.bounds[2][1], box.bounds[2][1]),
+        max(ybounds[2] + maximum(yoffsets), compass.bounds[2][2], box.bounds[2][2]))
+    zlims = (min(zbounds[1], compass.bounds[3][1], box.bounds[3][1]),
+        max(zbounds[2], compass.bounds[3][2], box.bounds[3][2]))
     margin = max(0.06 * max(xlims[2] - xlims[1], ylims[2] - ylims[1]),
         0.13 * max(xmax - xmin, ymax - ymin))
     limits!(ax, xlims[1] - margin, xlims[2] + margin,
@@ -171,7 +172,7 @@ end
 
 function _configuration_footer(figure, row, day; repeated, columns=1)
     meaning = repeated ? "Opaque: simulated cell   ·   Faded: periodic repetitions" : "Outlined: simulated cell"
-    Label(figure[row, 1:columns], "$meaning   ·   N: geographic north   ·   Geometry: $day";
+    Label(figure[row, 1:columns], "$meaning   ·   S: geographic south   ·   Geometry: $day";
         fontsize=19, color=RGBf(0.35, 0.35, 0.35), padding=(0, 0, 8, 8), tellwidth=false)
 end
 
@@ -182,7 +183,8 @@ Export each saved configuration as a single cell and with translucent periodic
 copies, plus one combined repeated-design figure. The opaque cell and its box
 are the simulated domain; copies share the original mesh and use exact saved
 domain periods. Local geometry is unchanged; the camera has one common
-geographic viewing direction and the north arrow uses the simulation rotation.
+geographic southwest viewing direction and the south arrow uses the simulation
+rotation. Copies stay above the foreground cell in the image.
 Default to the last saved scene date common to all requested configurations.
 Run through Kaimon with `mt=true`; no simulation is executed.
 """

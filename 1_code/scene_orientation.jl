@@ -15,7 +15,7 @@ end
 """
     agripv_local_cardinal_directions(scene_rotation_deg)
 
-Geographic north/east/up in the unchanged scene-local mesh coordinates.
+Geographic north/south/east/up in the unchanged scene-local mesh coordinates.
 ArchimedLight transforms geographic (east, north, up) directions to local
 coordinates with `(c*east + s*north, -s*east + c*north, up)`, where
 `c=cos(rotation)` and `s=sin(rotation)` (`src/turtle.jl:_scene_local_direction`).
@@ -25,17 +25,19 @@ not another rotation of the saved geometry.
 function agripv_local_cardinal_directions(scene_rotation_deg::Real)
     isfinite(scene_rotation_deg) || throw(ArgumentError("Scene rotation must be finite degrees."))
     s, c = sind(scene_rotation_deg), cosd(scene_rotation_deg)
-    return (; north=(s, c, 0.0), east=(c, -s, 0.0), up=(0.0, 0.0, 1.0))
+    return (; north=(s, c, 0.0), south=(-s, -c, 0.0), east=(c, -s, 0.0), up=(0.0, 0.0, 1.0))
 end
 
 """
-    agripv_local_camera_azimuth(scene_rotation_deg; geographic_azimuth_deg=45)
+    agripv_local_camera_azimuth(scene_rotation_deg; geographic_azimuth_deg=225)
 
-Makie azimuth is counterclockwise from geographic east. Apply the same
+The requested geographic azimuth is counterclockwise from east. Makie's local
+azimuth uses the same convention about local x. Apply the same
 geographic-to-local change of basis as the sun so every configuration is
-viewed from the same geographic direction. A 45° view is northeast.
+viewed from the same geographic direction. The default southwest view (225°)
+puts geographic south toward the lower right of the image.
 """
-function agripv_local_camera_azimuth(scene_rotation_deg::Real; geographic_azimuth_deg=45.0)
+function agripv_local_camera_azimuth(scene_rotation_deg::Real; geographic_azimuth_deg=225.0)
     all(isfinite, (scene_rotation_deg, geographic_azimuth_deg)) ||
         throw(ArgumentError("Scene rotation and geographic camera azimuth must be finite degrees."))
     return deg2rad(geographic_azimuth_deg - scene_rotation_deg)
@@ -56,14 +58,15 @@ function _agripv_orientation_domain(scene_or_mtg)
     return Float64.(domain)
 end
 
-function _agripv_north_arrow_layout(domain, scene_rotation_deg;
-    geographic_azimuth_deg=45.0, z=0.02)
+function _agripv_cardinal_arrow_layout(domain, scene_rotation_deg;
+    cardinal=:south, geographic_azimuth_deg=225.0, z=0.02)
+    cardinal in (:north, :south) || throw(ArgumentError("Select geographic :north or :south."))
     xmin, ymin, xmax, ymax = domain
     all(isfinite, domain) && xmin < xmax && ymin < ymax ||
-        throw(ArgumentError("The north arrow requires a finite positive domain."))
-    isfinite(z) || throw(ArgumentError("The north arrow height must be finite."))
+        throw(ArgumentError("The compass arrow requires a finite positive domain."))
+    isfinite(z) || throw(ArgumentError("The compass arrow height must be finite."))
     azimuth = agripv_local_camera_azimuth(scene_rotation_deg; geographic_azimuth_deg)
-    north = agripv_local_cardinal_directions(scene_rotation_deg).north
+    heading = getproperty(agripv_local_cardinal_directions(scene_rotation_deg), cardinal)
     xsign = cos(azimuth) >= 0 ? 1 : -1
     ysign = sin(azimuth) >= 0 ? 1 : -1
     span = max(xmax - xmin, ymax - ymin)
@@ -71,9 +74,9 @@ function _agripv_north_arrow_layout(domain, scene_rotation_deg;
     arrow_length = min(0.65, 0.24 * span)
     base = Point3f((xsign > 0 ? xmax : xmin) + xsign * gap,
         (ysign > 0 ? ymax : ymin) + ysign * gap, z)
-    direction = Vec3f(north)
+    direction = Vec3f(heading)
     tip = base + arrow_length * direction
-    side = Vec3f(-north[2], north[1], 0)
+    side = Vec3f(-heading[2], heading[1], 0)
     head_base = tip - 0.22 * arrow_length * direction
     left = head_base + 0.12 * arrow_length * side
     right = head_base - 0.12 * arrow_length * side
@@ -82,21 +85,29 @@ function _agripv_north_arrow_layout(domain, scene_rotation_deg;
     label = Point3f(tip + 0.22 * arrow_length * direction)
     points = Point3f[base, tip, left, tip, right, tip]
     bounds = ntuple(i -> extrema(point[i] for point in [points; [label]]), 3)
-    return (; points, label, bounds, direction=north)
+    return (; points, label, bounds, direction=heading, cardinal)
 end
 
-"""Draw geographic north outside a local domain, using the saved simulation rotation."""
-function agripv_north_arrow!(axis, domain::NTuple{4,<:Real}, rotation::Real;
-    fontsize=20, geographic_azimuth_deg=45.0)
-    layout = _agripv_north_arrow_layout(domain, rotation;
-        geographic_azimuth_deg)
+_agripv_north_arrow_layout(domain, rotation; kwargs...) =
+    _agripv_cardinal_arrow_layout(domain, rotation; cardinal=:north, kwargs...)
+
+"""Draw geographic south (or north) outside a domain, using the saved simulation rotation."""
+function agripv_cardinal_arrow!(axis, domain::NTuple{4,<:Real}, rotation::Real;
+    cardinal=:south, fontsize=20, geographic_azimuth_deg=225.0)
+    layout = _agripv_cardinal_arrow_layout(domain, rotation;
+        cardinal, geographic_azimuth_deg)
     linesegments!(axis, layout.points; color=:black, linewidth=2.5)
-    text!(axis, layout.label; text="N", fontsize, font=:bold, align=(:center, :center))
+    text!(axis, layout.label; text=cardinal == :south ? "S" : "N",
+        fontsize, font=:bold, align=(:center, :center))
     return layout
 end
 
-"""Draw geographic north from the domain and orientation of a saved scene."""
-function agripv_north_arrow!(axis, scene_or_mtg; kwargs...)
-    return agripv_north_arrow!(axis, _agripv_orientation_domain(scene_or_mtg),
+"""Draw a compass arrow from the domain and orientation of a saved scene."""
+function agripv_cardinal_arrow!(axis, scene_or_mtg; kwargs...)
+    return agripv_cardinal_arrow!(axis, _agripv_orientation_domain(scene_or_mtg),
         agripv_scene_rotation_deg(scene_or_mtg); kwargs...)
 end
+
+"""Draw geographic north from a saved scene or an explicit domain/rotation."""
+agripv_north_arrow!(args...; kwargs...) =
+    agripv_cardinal_arrow!(args...; cardinal=:north, kwargs...)

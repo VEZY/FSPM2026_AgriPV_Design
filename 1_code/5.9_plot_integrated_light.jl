@@ -1,7 +1,7 @@
 # Historical filename: colors show growth-cycle net assimilation, in mol CO₂/plant.
 using Dates, DataFrames, ArchimedLight, PlantGeom, GLMakie
 isdefined(@__MODULE__, :attach_assimilation_to_yearly_scene) || include("attach_assimilation_to_scene.jl")
-isdefined(@__MODULE__, :agripv_north_arrow!) || include("scene_orientation.jl")
+isdefined(@__MODULE__, :agripv_cardinal_arrow!) || include("scene_orientation.jl")
 
 """Plot and save growth-cycle net assimilation on a verified saved daily scene."""
 function plot_integrated_assimilation(; config_id=0, day=nothing,
@@ -20,11 +20,11 @@ function plot_integrated_assimilation(; config_id=0, day=nothing,
     ax = Axis3(fig[1, 1]; aspect=:data, perspectiveness=0,
         azimuth=agripv_local_camera_azimuth(rotation), elevation=deg2rad(30),
         xlabel="local x (m)", ylabel="local y (m)", zlabel="z (m)",
-        title="Scene rotation $(rotation |> Int)° · N: geographic north",
+        title="Scene rotation $(rotation |> Int)° · S: geographic south",
         viewmode=:fit, protrusions=50)
     plantviz!(ax, scene.mtg; color=:total_assimilation, color_mode=:node,
         colormap=:viridis, colorrange=color_range, color_missing=Makie.to_color(:gray85))
-    agripv_north_arrow!(ax, scene)
+    agripv_cardinal_arrow!(ax, scene)
     autolimits!(ax)
     Colorbar(fig[1, 2]; limits=color_range, colormap=:viridis,
         label="Growth-cycle net assimilation (mol CO₂/plant)")

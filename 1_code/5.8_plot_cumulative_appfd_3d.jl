@@ -1,6 +1,6 @@
 using GLMakie, PlantGeom, MultiScaleTreeGraph, TOML, Dates
 isdefined(@__MODULE__, :write_integrated_plant_outputs) || include("attach_assimilation_to_scene.jl")
-isdefined(@__MODULE__, :agripv_north_arrow!) || include("scene_orientation.jl")
+isdefined(@__MODULE__, :agripv_cardinal_arrow!) || include("scene_orientation.jl")
 
 # The small numeric CSVs and provenance.toml are derived from retained Parquet.
 # Cached summaries are accepted only for the same saved metadata and CSV hashes.
@@ -152,7 +152,7 @@ function plot_cumulative_appfd_3d(;
                 (xmax,ymax,0), (xmin,ymax,0), (xmin,ymin,0)];
                 color=:gray65, linewidth=1.5)
         end
-        agripv_north_arrow!(ax, saved.scene; fontsize=20)
+        agripv_cardinal_arrow!(ax, saved.scene; fontsize=20)
         autolimits!(ax)
     end
     Colorbar(f[2:3, 3]; colormap=:viridis, limits=colorrange, width=24,
@@ -161,7 +161,7 @@ function plot_cumulative_appfd_3d(;
         "Green-leaf absorption · one value per plant · geometry: $(day)"
     Label(f[4, 1:2], footer, fontsize=18, color=:gray35)
     Label(f[5, 1:2], (with_panels ? "Panels and ground shown in gray" : "Crop view · panels omitted to reveal spatial patterns") *
-        " · N: geographic north · common geographic view", fontsize=17, color=:gray45)
+        " · S: geographic south · common geographic view", fontsize=17, color=:gray45)
     rowsize!(f.layout, 0, Makie.Fixed(42))
     rowsize!(f.layout, 1, Makie.Fixed(32))
     rowgap!(f.layout, 10)
