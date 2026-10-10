@@ -33,7 +33,9 @@ Figures are written under `2_outputs/`, including `fapar/`,
 `cumulative_appfd/` and `cumulative_assimilation/`.
 
 The plotting readers and aggregates have a separate synthetic-output test suite
-that does not run simulations. Execute it through Kaimon with `mt=true`:
+that does not run simulations. It also checks signed all-plant assimilation,
+shared-facet data, and the direction transform against ArchimedLight itself.
+Execute it through Kaimon with `mt=true`:
 
 ```julia
 include("1_code/tests/plotting_runtests.jl")
@@ -58,7 +60,14 @@ simulated canopy.
 `2_outputs/configurations_repeated.png` combines the four repeated designs.
 Only the simulated cell has a bounding box. Copy spacing comes from the exact
 `scene.scene_xy_bounds` periods; axes remain in local scene coordinates, while
-titles give the panel heading and the camera preserves the original orientation.
+titles give the saved scene rotation. Every 3D plotting path uses the same
+geographic northeast viewpoint and marks geographic north with an arrow.
+ArchimedLight rotates sky directions into the unchanged local mesh coordinates:
+for a saved rotation θ, local north is `(sin(θ), cos(θ), 0)` and the camera's
+local azimuth is `45° − θ`. Thus north is −local y for configurations 0/2
+(180°) and +local x for configurations 1/3 (90°). The reusable
+`scene_orientation.jl` applies this convention to configuration views, daily
+snapshots, and cumulative 3D maps.
 
 For another saved date or repetition setting, use the reusable functions:
 
@@ -139,9 +148,17 @@ It refreshes summaries when their source metadata or CSV hashes change.
 The historical `5.9_plot_integrated_light.jl` filename shows assimilation and
 saves `cumulative_assimilation/integrated_assimilation_3d_config_0.png`.
 Source Parquet remains untouched.
-`5.7_plot_year_cumulative_assimilation.jl` materializes three representative
-plant curves per configuration and the complete crop-total curve. DuckDB computes
-the full-cycle sums on disk, with chronological ordering and stable planting IDs.
+`5.5_plot_day_assimilation_step.jl` and
+`5.7_plot_year_cumulative_assimilation.jl` use AlgebraOfGraphics with four
+configuration facets, common x/y scales, outside tick labels, shared axis labels,
+and one legend. Each plant has a translucent curve and each configuration's
+arithmetic plant mean is red. Annual curves use stable `plant_instance_id` and
+show daily endpoints in mol CO₂/plant; every signed hourly step contributes to
+the integral. DuckDB computes the sums from saved outputs with chronological
+ordering, and the reader checks complete plant coverage at every timestamp.
+The annual script also retains the complete hourly crop-total figure.
+`summarize_year_assimilation(; curve_sampling=:hourly, ...)` can return hourly
+individual curves when needed.
 
 First, instantiate the project:
 

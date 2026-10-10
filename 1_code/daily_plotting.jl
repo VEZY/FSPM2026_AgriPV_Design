@@ -1,6 +1,7 @@
 using CSV, DataFrames, Dates, Statistics, TOML
 using GLMakie, PlantGeom
 isdefined(@__MODULE__, :load_day_outputs) || include("saved_simulation.jl")
+isdefined(@__MODULE__, :agripv_north_arrow!) || include("scene_orientation.jl")
 
 """Find the saved daily or growth-period recipe for one configuration and day."""
 function _agripv_plot_day_metadata(config_id, day, input_dir)
@@ -267,8 +268,17 @@ function plot_output(mtg, table; variable=:A, timestep=13, label=string(variable
     all(isfinite, range) && first(range) < last(range) ||
         throw(ArgumentError("colorrange must be finite and strictly increasing."))
     attach_outputs!(mtg, table; timestep, variables=(variable,))
-    figure, axis, plot = plantviz(mtg; color=variable, color_mode=:node,
+    rotation = agripv_scene_rotation_deg(mtg)
+    figure = Figure(size=(1200, 900))
+    axis = Axis3(figure[1, 1]; aspect=:data, perspectiveness=0,
+        azimuth=agripv_local_camera_azimuth(rotation), elevation=deg2rad(30),
+        xlabel="local x (m)", ylabel="local y (m)", zlabel="z (m)",
+        title="Scene rotation $(rotation |> Int)° · N: geographic north",
+        viewmode=:fit, protrusions=50)
+    plot = plantviz!(axis, mtg; color=variable, color_mode=:node,
         colorrange=range, colormap, color_missing=Makie.to_color(color_missing), kwargs...)
+    agripv_north_arrow!(axis, mtg)
+    autolimits!(axis)
     PlantGeom.colorbar(figure[1, 2], plot; label)
     return figure, axis, plot
 end

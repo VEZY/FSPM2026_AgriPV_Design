@@ -1,5 +1,6 @@
 using GLMakie, PlantGeom, MultiScaleTreeGraph, TOML, Dates
 isdefined(@__MODULE__, :write_integrated_plant_outputs) || include("attach_assimilation_to_scene.jl")
+isdefined(@__MODULE__, :agripv_north_arrow!) || include("scene_orientation.jl")
 
 # The small numeric CSVs and provenance.toml are derived from retained Parquet.
 # Cached summaries are accepted only for the same saved metadata and CSV hashes.
@@ -131,9 +132,11 @@ function plot_cumulative_appfd_3d(;
     for (i, saved) in enumerate(scenes)
         row, col = (i-1) ÷ 2 + 2, (i-1) % 2 + 1
         c = saved.config
-        ax = Axis3(f[row, col]; aspect=:data, azimuth=0.32pi, elevation=0.24pi,
-            perspectiveness=0, xlabel="x (m)", ylabel="y (m)", zlabel="z (m)",
-            title="Config $(i-1)  ·  $(c.panel_x_distance) × $(c.panel_y_distance) m  ·  $(Int(c.panel_orientation))°",
+        rotation = agripv_scene_rotation_deg(saved.scene)
+        ax = Axis3(f[row, col]; aspect=:data,
+            azimuth=agripv_local_camera_azimuth(rotation), elevation=0.24pi,
+            perspectiveness=0, xlabel="local x (m)", ylabel="local y (m)", zlabel="z (m)",
+            title="Config $(i-1)  ·  $(c.panel_x_distance) × $(c.panel_y_distance) m  ·  scene rotation $(Int(rotation))°",
             titlesize=22, titlegap=6, viewmode=:fit, protrusions=40,
             zticks=with_panels ? [0.0, 2.0, 4.0] : [0.0, 0.6],
             zgridvisible=false, xticklabelsize=17, yticklabelsize=17, zticklabelsize=17)
@@ -144,17 +147,21 @@ function plot_cumulative_appfd_3d(;
             plantviz!(ax, saved.scene.mtg; color=:cumulative_appfd, color_mode=:node,
                 colorrange, colormap=:viridis, color_missing=Makie.to_color(:gray85),
                 filter_fun=n -> symbol(n) in (:Stem, :LeafSection))
-            lines!(ax, Point3f[(0,0,0), (c.panel_x_distance,0,0),
-                (c.panel_x_distance,c.panel_y_distance,0), (0,c.panel_y_distance,0), (0,0,0)];
+            xmin, ymin, xmax, ymax = _agripv_orientation_domain(saved.scene)
+            lines!(ax, Point3f[(xmin,ymin,0), (xmax,ymin,0),
+                (xmax,ymax,0), (xmin,ymax,0), (xmin,ymin,0)];
                 color=:gray65, linewidth=1.5)
         end
+        agripv_north_arrow!(ax, saved.scene; fontsize=20)
+        autolimits!(ax)
     end
     Colorbar(f[2:3, 3]; colormap=:viridis, limits=colorrange, width=24,
         label=spec.label)
     footer = quantity == :assimilation ? "Sum over all green leaves and timesteps · geometry: $(day)" :
         "Green-leaf absorption · one value per plant · geometry: $(day)"
     Label(f[4, 1:2], footer, fontsize=18, color=:gray35)
-    Label(f[5, 1:2], with_panels ? "Panels and ground shown in gray" : "Crop view · panels omitted to reveal spatial patterns", fontsize=17, color=:gray45)
+    Label(f[5, 1:2], (with_panels ? "Panels and ground shown in gray" : "Crop view · panels omitted to reveal spatial patterns") *
+        " · N: geographic north · common geographic view", fontsize=17, color=:gray45)
     rowsize!(f.layout, 0, Makie.Fixed(42))
     rowsize!(f.layout, 1, Makie.Fixed(32))
     rowgap!(f.layout, 10)

@@ -1,6 +1,7 @@
 using GLMakie, GeometryBasics, Colors, Dates, TOML
 using PlantGeom, MultiScaleTreeGraph
 isdefined(@__MODULE__, :load_yearly_scene) || include("saved_simulation.jl")
+isdefined(@__MODULE__, :agripv_north_arrow!) || include("scene_orientation.jl")
 
 function _configuration_saved_day(config_ids, output_dir, day)
     days = nothing
@@ -67,14 +68,17 @@ function _configuration_geometry(; config_id, day, output_dir)
     # Build normals once and share this geometry between all translated plots.
     mesh = GeometryBasics.normal_mesh(GeometryBasics.Mesh(points, triangles))
     bounds = ntuple(i -> extrema(point[i] for point in points), 3)
-    return (; config_id, day, config=saved.config, domain, mesh, colors, ghost_colors, bounds)
+    rotation = agripv_scene_rotation_deg(scene)
+    # The overview needs the mesh, domain and orientation only. Release the
+    # reconstructed MTG instead of retaining four complete scenes in memory.
+    return (; config_id, day, config=saved.config, rotation, domain, mesh, colors, ghost_colors, bounds)
 end
 
 function _configuration_offsets(prepared; repeats=(2, 2))
     nx, ny = repeats
     nx isa Integer && ny isa Integer && nx > 0 && ny > 0 ||
         throw(ArgumentError("repeats must contain two positive integer tile counts."))
-    azimuth = deg2rad(45 + prepared.config.panel_orientation)
+    azimuth = agripv_local_camera_azimuth(prepared.rotation)
     # Put the opaque simulation cell in the foreground for either orientation.
     xdirection = cos(azimuth) >= 0 ? -1 : 1
     ydirection = sin(azimuth) >= 0 ? -1 : 1
@@ -92,29 +96,43 @@ function _configuration_box!(ax, prepared; fontsize=20)
     linesegments!(ax, [corners[i] for edge in edges for i in edge];
         color=RGBf(0.15, 0.15, 0.15), linewidth=1.2)
 
-    azimuth = deg2rad(45 + prepared.config.panel_orientation)
+    azimuth = agripv_local_camera_azimuth(prepared.rotation)
     xfront = cos(azimuth) >= 0 ? xmax : xmin
     yfront = sin(azimuth) >= 0 ? ymax : ymin
     xsign = cos(azimuth) >= 0 ? 1 : -1
     ysign = sin(azimuth) >= 0 ? 1 : -1
     dx, dy = xmax - xmin, ymax - ymin
-    label_gap = 0.10 * max(dx, dy)
-    text!(ax, Point3f((xmin + xmax) / 2, yfront + ysign * label_gap, zmin);
-        text="x (m)", fontsize, align=(:center, :center))
-    text!(ax, Point3f(xfront + xsign * label_gap, (ymin + ymax) / 2, zmin);
-        text="y (m)", fontsize, align=(:center, :center))
+    horizontal_span = max(dx, dy)
+    label_scale = max(horizontal_span, zmax - zmin)
+    label_gap = 0.20 * horizontal_span
+    # Keep captions below the ground plane: a label at zmin is hidden by
+    # the foreground canopy even when its horizontal anchor is outside it.
+    caption_z = zmin - 0.06 * label_scale
+    xcaption = Point3f((xmin + xmax) / 2, yfront + ysign * label_gap, caption_z)
+    ycaption = Point3f(xfront + xsign * label_gap, (ymin + ymax) / 2, caption_z)
+    text!(ax, xcaption;
+        text="local x (m)", fontsize, align=(:center, :center))
+    text!(ax, ycaption;
+        text="local y (m)", fontsize, align=(:center, :center))
     # Use the leftmost box edge for z labels, away from the foreground canopy.
     horizontal = (-sin(azimuth), cos(azimuth))
     zcorner = (horizontal[1] >= 0 ? xmin : xmax, horizontal[2] >= 0 ? ymin : ymax)
-    text!(ax, Point3f(zcorner[1] - horizontal[1] * label_gap,
-        zcorner[2] - horizontal[2] * label_gap, (zmin + zmax) / 2);
+    # Separate the vertical caption from the tick numbers in screen space.
+    tick_gap = 0.08 * label_scale
+    zcaption_gap = 0.27 * label_scale
+    zcaption = Point3f(zcorner[1] - horizontal[1] * zcaption_gap,
+        zcorner[2] - horizontal[2] * zcaption_gap, (zmin + zmax) / 2)
+    text!(ax, zcaption;
         text="z (m)", fontsize, rotation=pi / 2, align=(:center, :center))
+    label_points = Point3f[xcaption, ycaption, zcaption]
     for z in 0:2:floor(Int, zmax)
-        text!(ax, Point3f(zcorner[1] - horizontal[1] * label_gap * 0.35,
-            zcorner[2] - horizontal[2] * label_gap * 0.35, z);
+        tick = Point3f(zcorner[1] - horizontal[1] * tick_gap,
+            zcorner[2] - horizontal[2] * tick_gap, z)
+        push!(label_points, tick)
+        text!(ax, tick;
             text=string(z), fontsize=fontsize - 3, align=(:center, :center))
     end
-    return nothing
+    return (; bounds=ntuple(i -> extrema(point[i] for point in label_points), 3))
 end
 
 function _configuration_axis!(position, prepared; repeats=(2, 2), repeat_alpha=0.18, fontsize=20)
@@ -122,8 +140,8 @@ function _configuration_axis!(position, prepared; repeats=(2, 2), repeat_alpha=0
     offsets = _configuration_offsets(prepared; repeats)
     xmin, ymin, xmax, ymax = prepared.domain
     ax = Axis3(position; aspect=:data, perspectiveness=0,
-        azimuth=deg2rad(45 + prepared.config.panel_orientation), elevation=deg2rad(30),
-        title="Config $(prepared.config_id) · $(prepared.config.panel_orientation |> Int)°\n$(xmax - xmin) × $(ymax - ymin) m simulated cell",
+        azimuth=agripv_local_camera_azimuth(prepared.rotation), elevation=deg2rad(30),
+        title="Config $(prepared.config_id) · scene rotation $(prepared.rotation |> Int)°\n$(xmax - xmin) × $(ymax - ymin) m simulated cell",
         titlefont=:bold, titlesize=fontsize + 2, protrusions=(15, 15, 20, 85),
         xspinesvisible=false, yspinesvisible=false, zspinesvisible=false,
         xypanelvisible=false, xzpanelvisible=false, yzpanelvisible=false)
@@ -134,21 +152,26 @@ function _configuration_axis!(position, prepared; repeats=(2, 2), repeat_alpha=0
             alpha=original ? 1.0 : repeat_alpha, transparency=!original)
         translate!(p, dx, dy, 0)
     end
-    _configuration_box!(ax, prepared; fontsize)
+    box = _configuration_box!(ax, prepared; fontsize)
+    north = agripv_north_arrow!(ax, prepared.domain, prepared.rotation; fontsize)
     xoffsets, yoffsets = first.(offsets), last.(offsets)
     xbounds, ybounds, zbounds = prepared.bounds
-    xlims = (xbounds[1] + minimum(xoffsets), xbounds[2] + maximum(xoffsets))
-    ylims = (ybounds[1] + minimum(yoffsets), ybounds[2] + maximum(yoffsets))
+    xlims = (min(xbounds[1] + minimum(xoffsets), north.bounds[1][1], box.bounds[1][1]),
+        max(xbounds[2] + maximum(xoffsets), north.bounds[1][2], box.bounds[1][2]))
+    ylims = (min(ybounds[1] + minimum(yoffsets), north.bounds[2][1], box.bounds[2][1]),
+        max(ybounds[2] + maximum(yoffsets), north.bounds[2][2], box.bounds[2][2]))
+    zlims = (min(zbounds[1], north.bounds[3][1], box.bounds[3][1]),
+        max(zbounds[2], north.bounds[3][2], box.bounds[3][2]))
     margin = max(0.06 * max(xlims[2] - xlims[1], ylims[2] - ylims[1]),
         0.13 * max(xmax - xmin, ymax - ymin))
     limits!(ax, xlims[1] - margin, xlims[2] + margin,
-        ylims[1] - margin, ylims[2] + margin, zbounds[1] - 0.05, zbounds[2] + 0.15)
+        ylims[1] - margin, ylims[2] + margin, zlims[1] - 0.15, zlims[2] + 0.15)
     return ax
 end
 
 function _configuration_footer(figure, row, day; repeated, columns=1)
     meaning = repeated ? "Opaque: simulated cell   ·   Faded: periodic repetitions" : "Outlined: simulated cell"
-    Label(figure[row, 1:columns], "$meaning   ·   Geometry: $day";
+    Label(figure[row, 1:columns], "$meaning   ·   N: geographic north   ·   Geometry: $day";
         fontsize=19, color=RGBf(0.35, 0.35, 0.35), padding=(0, 0, 8, 8), tellwidth=false)
 end
 
@@ -158,7 +181,8 @@ end
 Export each saved configuration as a single cell and with translucent periodic
 copies, plus one combined repeated-design figure. The opaque cell and its box
 are the simulated domain; copies share the original mesh and use exact saved
-domain periods. Preserve the orientation convention of the historical figure.
+domain periods. Local geometry is unchanged; the camera has one common
+geographic viewing direction and the north arrow uses the simulation rotation.
 Default to the last saved scene date common to all requested configurations.
 Run through Kaimon with `mt=true`; no simulation is executed.
 """

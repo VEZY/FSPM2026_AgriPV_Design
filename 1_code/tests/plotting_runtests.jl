@@ -4,3 +4,6 @@
 include("daily_plotting.jl")
 include("year_fapar.jl")
 include("integrated_outputs.jl")
+include("assimilation_plotting.jl")
+include("yearly_assimilation_plotting.jl")
+include("scene_orientation.jl")

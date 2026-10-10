@@ -13,3 +13,6 @@ include("integrated_outputs.jl")
 include("daily_plotting.jl")
 
 include("parquet_output_io.jl")
+include("assimilation_plotting.jl")
+include("yearly_assimilation_plotting.jl")
+include("scene_orientation.jl")
