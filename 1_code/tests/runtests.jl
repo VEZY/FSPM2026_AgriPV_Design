@@ -9,9 +9,7 @@ include("saved_simulation.jl")
 include("fvcb.jl")
 include("year_simulation.jl")
 include("year_fapar.jl")
+include("integrated_outputs.jl")
+include("daily_plotting.jl")
 
 include("parquet_output_io.jl")
-# The temporary local repair runner is intentionally not tracked with the repo.
-if isfile(joinpath(@__DIR__, "..", "..", "2_outputs", "overnight_scripts", "run_missing_outputs.jl"))
-    include("missing_output_repair.jl")
-end

@@ -4,7 +4,9 @@ using AlgebraOfGraphics
 using GLMakie
 using Statistics, DataFramesMeta
 
-meteo = CSV.read("0_simulations/meteo/meteo_data_2025_montpellier.csv", DataFrame)
+year_assimilation_root = normpath(joinpath(@__DIR__, ".."))
+meteo = CSV.read(joinpath(year_assimilation_root, "0_simulations", "meteo",
+    "meteo_data_2025_montpellier.csv"), DataFrame)
 
 isdefined(@__MODULE__, :with_saved_outputs) || include("parquet_output_io.jl")
 # Query the complete cycle in DuckDB. Materialize only three plants per config
@@ -14,6 +16,49 @@ individual = DataFrame[]
 whole_crop = DataFrame[]
 for config_id in configIDs
     with_saved_outputs(; config_id, tables=:plants) do con, metadata
+        get(metadata, "simulation", nothing) == "growth_period" && metadata["config_id"] == config_id ||
+            throw(ArgumentError("Expected growth-period metadata for configuration $config_id."))
+        get(metadata, "plant_instance_identity_scope", nothing) == "configuration" ||
+            throw(ArgumentError("Annual per-plant curves require persistent plant_instance_id across saved days."))
+        coverage = DataFrame(DBInterface.execute(con, """
+            SELECT datetime, count(*) AS source_rows,
+                count(DISTINCT plant_instance_id) AS distinct_plants,
+                min(plant_instance_id) AS first_plant, max(plant_instance_id) AS last_plant,
+                count(*) FILTER (WHERE datetime IS NULL OR plant_instance_id IS NULL
+                    OR assimilation_step IS NULL OR NOT isfinite(assimilation_step)) AS invalid_rows
+            FROM plants GROUP BY datetime ORDER BY datetime
+            """))
+        !isempty(coverage) && all(==(0), coverage.invalid_rows) ||
+            throw(ArgumentError("Missing identity/timestamp or invalid assimilation step in configuration $config_id."))
+        sum(coverage.source_rows) == metadata["tables"]["plants"]["rows"] ||
+            throw(ArgumentError("Plant output row count differs from saved metadata for configuration $config_id."))
+        scene_plants = Dict(Date(entry["scene"]["day"]) =>
+            length(entry["scene"]["plant_rotations_rad"]) for entry in metadata["scenes"])
+        length(scene_plants) == length(metadata["scenes"]) == length(metadata["days"]) &&
+            allunique(metadata["days"]) ||
+            throw(ArgumentError("Repeated scene or period dates in configuration $config_id."))
+        Set(Date.(coverage.datetime)) == Set(Date.(metadata["days"])) == Set(keys(scene_plants)) ||
+            throw(ArgumentError("Plant output dates differ from the saved growth period for configuration $config_id."))
+        complete_positions = all(eachrow(coverage)) do row
+            expected = scene_plants[Date(row.datetime)]
+            row.source_rows == row.distinct_plants == expected &&
+                row.first_plant > 0
+        end
+        complete_positions ||
+            throw(ArgumentError("Repeated or missing planting positions at a timestamp in configuration $config_id."))
+        expected_counts = unique(collect(values(scene_plants)))
+        if length(expected_counts) == 1
+            cycle_positions = only(DataFrame(DBInterface.execute(con,
+                "SELECT count(DISTINCT plant_instance_id) AS positions FROM plants")).positions)
+            cycle_positions == only(expected_counts) ||
+                throw(ArgumentError("Persistent planting identities change within configuration $config_id."))
+        end
+        if haskey(metadata, "forcing")
+            saved_forcing = _agripv_read_parquet(joinpath(year_assimilation_root, "2_outputs", "simulations", "yearly"),
+                metadata["forcing"]; variables=[:date])
+            Set(coverage.datetime) == Set(DateTime.(saved_forcing.date)) ||
+                throw(ArgumentError("Plant output timestamps differ from saved forcing for configuration $config_id."))
+        end
         push!(individual, DataFrame(DBInterface.execute(con, """
             SELECT $config_id AS configID, plant_instance_id, datetime,
                 sum(assimilation_step) OVER (
@@ -99,15 +144,19 @@ begin
                 :datetime => (x -> DateTime(x)) => "Time",
                 # :timestep => "Timestep",
                 :assimilation_cumulative => "Cumulative assimilation (μmol CO₂/plant)",
-                group = :plant_instance_id
+                group = :plant_instance_id,
+                color = :plant_instance_id => string => "Plant instance"
             ) *
-            visual(Lines, alpha=0.05)
+            visual(Lines, alpha=0.9, linewidth=2)
 
-        draw!(f1[row, col], aPPFD; axis=(title="Config $configID",))
+        grid = draw!(f1[row, col], aPPFD; axis=(title="Config $configID",))
+        legend!(f1[row, col], grid; tellheight=false, tellwidth=false,
+            halign=:left, valign=:top)
     end
     f1
 end
-save("2_outputs/year_cumulative_assimilation_per_plant.png", f1, update=false, px_per_unit=3.0)
+save(joinpath(year_assimilation_root, "2_outputs", "year_cumulative_assimilation_per_plant.png"),
+    f1, px_per_unit=3.0)
 
 
 
@@ -149,4 +198,5 @@ begin
     # axislegend(f2[1,1]; position=:rt)
     f2
 end
-save("2_outputs/year_cumulative_assimilation_total.png", f2, update=false, px_per_unit=3.0)
+save(joinpath(year_assimilation_root, "2_outputs", "year_cumulative_assimilation_total.png"),
+    f2, px_per_unit=3.0)

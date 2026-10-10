@@ -1,8 +1,37 @@
-using GLMakie, PlantGeom, GeometryBasics, MultiScaleTreeGraph, TOML, Dates, SHA
-isdefined(@__MODULE__, :agripv_scene) || include("scene.jl")
+using GLMakie, PlantGeom, MultiScaleTreeGraph, TOML, Dates
+isdefined(@__MODULE__, :write_integrated_plant_outputs) || include("attach_assimilation_to_scene.jl")
 
-# The small numeric CSVs and provenance.json are derived from the retained
-# Parquet outputs. Their aggregation recipe is saved alongside the figures.
+# The small numeric CSVs and provenance.toml are derived from retained Parquet.
+# Cached summaries are accepted only for the same saved metadata and CSV hashes.
+function _ensure_cumulative_plant_summaries(input_dir, summary_dir)
+    manifest = joinpath(summary_dir, "provenance.toml")
+    current = false
+    if isfile(manifest)
+        provenance = TOML.parsefile(manifest)
+        entries = get(provenance, "configs", [])
+        current = get(provenance, "recipe_version", 0) == 2 &&
+            get(provenance, "photons_per_J", nothing) == 4.57 &&
+            length(entries) == 4 && Set(x["config_id"] for x in entries) == Set(0:3)
+        for entry in entries
+            metadata_path = joinpath(input_dir, "scene_config_$(entry["config_id"]).toml")
+            csv_path = joinpath(summary_dir, entry["output_file"])
+            current &= isfile(metadata_path) && isfile(csv_path) &&
+                _agripv_saved_file_sha256(metadata_path) == entry["source_metadata_sha256"] &&
+                _agripv_saved_file_sha256(csv_path) == entry["output_sha256"]
+        end
+    end
+    if current
+        for config_id in 0:3
+            metadata = TOML.parsefile(joinpath(input_dir, "scene_config_$(config_id).toml"))
+            for role in (:plants, :light, :forcing)
+                info = role == :forcing ? metadata["forcing"] : metadata["tables"][string(role)]
+                _agripv_saved_files(input_dir, info; verify_hash=true)
+            end
+        end
+    end
+    current || write_integrated_plant_outputs(; output_dir=input_dir, summary_dir)
+    return nothing
+end
 function _cumulative_appfd_values(path; column="cumulative_appfd_mol_m2", allow_negative=false)
     lines = readlines(path)
     header = split(first(lines), ',')
@@ -41,50 +70,13 @@ function _attach_cumulative_plant_values!(mtg, values)
     return mtg
 end
 
-# Same world-space geometry/topology contract as saved_simulation.jl.
-function _cumulative_scene_fingerprint(scene)
-    io = IOBuffer()
-    MultiScaleTreeGraph.traverse!(scene.mtg) do node
-        ancestor = parent(node)
-        print(io, node_id(node), '|', isnothing(ancestor) ? 0 : node_id(ancestor), '|',
-            symbol(node), '|', MultiScaleTreeGraph.scale(node), '|',
-            MultiScaleTreeGraph.index(node), '|', node[:state], '\n')
-        mesh = PlantGeom.refmesh_to_mesh(node)
-        if isnothing(mesh)
-            write(io, Int64(0))
-        else
-            points, triangles = GeometryBasics.coordinates(mesh), GeometryBasics.faces(mesh)
-            write(io, Int64(length(points)), Int64(length(triangles)))
-            for point in points, value in point
-                write(io, Float64(value))
-            end
-            for face in triangles, value in face
-                write(io, Int64(value))
-            end
-        end
-    end
-    return bytes2hex(SHA.sha256(take!(io)))
-end
-
 function _cumulative_appfd_scene(root, config_id, day, values)
-    metadata = TOML.parsefile(joinpath(root, "scene_config_$(config_id).toml"))
-    entry = only(filter(x -> x["scene"]["day"] == string(day), metadata["scenes"]))
-    recipe = entry["scene"]
-    project = normpath(joinpath(@__DIR__, ".."))
-    sources = Dict(name => normpath(joinpath(project, recipe[name * "_path"])) for name in ("obj", "mtg"))
-    for (name, path) in sources
-        bytes2hex(open(SHA.sha256, path)) == recipe[name * "_sha256"] ||
-            throw(ArgumentError("Changed geometry source: $path"))
-    end
-    config = (; (Symbol(k) => v for (k, v) in recipe["config"])...)
-    scene = agripv_scene(; c=config, day, obj_path=sources["obj"], mtg_path=sources["mtg"],
-        plant_density=recipe["plant_density"], ground_res=recipe["ground_res"],
-        ground_nx=recipe["ground_nx"], ground_ny=recipe["ground_ny"],
-        plant_rotations=recipe["plant_rotations_rad"])
-    _cumulative_scene_fingerprint(scene) == entry["scene_sha256"] ||
-        throw(ArgumentError("Rebuilt geometry differs from the saved scene."))
-    _attach_cumulative_plant_values!(scene.mtg, values)
-    return (; scene, config, days=metadata["days"])
+    saved = load_yearly_scene(; config_id, day, output_dir=root)
+    metadata_path = joinpath(root, "scene_config_$(config_id).toml")
+    metadata = TOML.parsefile(metadata_path)
+    _attach_cumulative_plant_values!(saved.scene.mtg, values)
+    return (; saved.scene, saved.config, days=metadata["days"],
+        source_metadata_sha256=_agripv_saved_file_sha256(metadata_path))
 end
 
 """
@@ -98,7 +90,12 @@ absorbed PPFD on one saved day's geometry. Run via Kaimon with `mt=true`.
 function plot_cumulative_appfd_3d(;
     input_dir=normpath(joinpath(@__DIR__, "..", "2_outputs", "simulations", "yearly")),
     summary_dir=normpath(joinpath(@__DIR__, "..", "2_outputs", "cumulative_appfd")),
-    day=Date(2025, 7, 2), with_panels=false, prepared=nothing, quantity=:appfd)
+    day=nothing, with_panels=false, prepared=nothing, quantity=:appfd)
+    _ensure_cumulative_plant_summaries(input_dir, summary_dir)
+    if isnothing(day)
+        metadata = TOML.parsefile(joinpath(input_dir, "scene_config_0.toml"))
+        day = maximum(Date.(metadata["days"]))
+    end
     specs = Dict(
         :appfd => (; column="cumulative_appfd_mol_m2", title="Cumulative absorbed PPFD",
             label="Integrated leaf-mean aPPFD (mol photons m⁻²)", rounding=100.0, stem="cumulative_appfd", allow_negative=false),
@@ -114,6 +111,13 @@ function plot_cumulative_appfd_3d(;
     scenes = isnothing(prepared) ? [_cumulative_appfd_scene(input_dir, c, day, values[c+1]) for c in 0:3] : prepared
     length(scenes) == 4 || throw(ArgumentError("Expected four prepared configurations."))
     all(x -> x.days == scenes[1].days, scenes) || throw(ArgumentError("Configuration periods differ."))
+    for (config_id, saved) in enumerate(scenes)
+        metadata_path = joinpath(input_dir, "scene_config_$(config_id-1).toml")
+        saved.source_metadata_sha256 == _agripv_saved_file_sha256(metadata_path) ||
+            throw(ArgumentError("Prepared geometry belongs to a different saved configuration."))
+        saved.scene.mtg[:agripv_scene_recipe]["day"] == string(day) ||
+            throw(ArgumentError("Prepared geometry belongs to a different day."))
+    end
     for (saved, plant_values) in zip(scenes, values)
         _attach_cumulative_plant_values!(saved.scene.mtg, plant_values)
     end

@@ -1,5 +1,5 @@
-# Execute through Kaimon with mt=true (GLMakie). Each 14 GB light CSV is read
-# once in 32 MiB batches; only the small hourly/daily summaries are retained.
+# Execute through Kaimon with mt=true (GLMakie). Aggregate saved Parquet in
+# DuckDB, or stream legacy CSV; only small hourly/daily summaries are retained.
 include("year_fapar.jl")
 include("year_fapar_plot.jl")
 
@@ -18,7 +18,7 @@ for configID in configIDs
         TOML.print(io, Dict("config_id" => configID,
             "source_sha256" => summary.source_sha256, "source_rows" => summary.rows,
             "batch_bytes" => 32*1024^2,
-            "incoming_source" => "current project climate and archimed_meteo sky preparation"))
+            "incoming_source" => summary.incoming_source))
     end
     push!(daily_tables, summary.daily)
 end

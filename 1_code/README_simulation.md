@@ -1,5 +1,75 @@
 # Daily light and physiology simulation
 
+## Regenerate figures from saved outputs
+
+Start or connect a Kaimon session for this project, then execute with `mt=true`
+for GLMakie:
+
+```julia
+include("1_code/5_regenerate_plots.jl")
+regenerate_saved_plots()
+# Or regenerate a subset:
+regenerate_saved_plots(; groups=(:daily, :assimilation))
+```
+
+This runs the configuration views in `4.0` and figures `5.1`–`5.9` from the
+retained results and refreshes the small cumulative summaries. It does not invoke
+a simulation. Daily figures use the 2 July snapshot in the yearly dataset;
+annual figures use the complete saved
+cycle. The historical `5.1` filename now shows saved absorbed PAR instead of
+computing a new static light simulation. The individual plotting functions
+accept another saved day or input directory where relevant.
+Figure `5.3` reconstructs absorbed energy (`Ra_PAR_f * area * duration_s`, J per
+plant per saved step) from compact radiation outputs and saved forcing durations.
+Its reader also provides absorbed power (W per plant) with `quantity=:power`.
+
+Keep the saved TOML recipes and original OBJ/MTG files with the output tables.
+Scene views verify source hashes, geometry fingerprints and identities before
+attaching values. Cross-day sums use `plant_instance_id` within each
+configuration; daily MTG `node_id` values can change as plants grow. Derived
+cumulative CSVs have a checksum manifest and are refreshed when the saved
+metadata changes. Missing outputs or mismatched identities stop plotting.
+Figures are written under `2_outputs/`, including `fapar/`,
+`cumulative_appfd/` and `cumulative_assimilation/`.
+
+The plotting readers and aggregates have a separate synthetic-output test suite
+that does not run simulations. Execute it through Kaimon with `mt=true`:
+
+```julia
+include("1_code/tests/plotting_runtests.jl")
+```
+
+## Plot the configuration designs
+
+Through Kaimon with `mt=true`, generate all four configuration views:
+
+```julia
+include("1_code/4.0_show_config.jl")
+```
+
+This rebuilds geometry from the saved yearly recipes, verifies source hashes and
+geometry fingerprints, and defaults to the last date shared by all four
+configurations. It does not run simulations. Each configuration exports
+`2_outputs/config_ID.png` for the simulated cell and
+`2_outputs/config_ID_repeated.png` for a 2×2 layout: the opaque simulated cell
+and three translucent copies (`repeat_alpha=0.18`). Repeated foliage is also
+desaturated and uses lower opacity so overlapping leaves do not obscure the
+simulated canopy.
+`2_outputs/configurations_repeated.png` combines the four repeated designs.
+Only the simulated cell has a bounding box. Copy spacing comes from the exact
+`scene.scene_xy_bounds` periods; axes remain in local scene coordinates, while
+titles give the panel heading and the camera preserves the original orientation.
+
+For another saved date or repetition setting, use the reusable functions:
+
+```julia
+include("1_code/configuration_plotting.jl")
+plot_configurations(; day=Date(2025, 5, 15), repeats=(2, 2), repeat_alpha=0.18)
+# Or use the full figure entrypoint for just these views:
+include("1_code/5_regenerate_plots.jl")
+regenerate_saved_plots(; groups=(:configurations,))
+```
+
 ## DuckDB / Parquet output storage
 
 Daily and growth-period writers default to `storage=:parquet` with lossless
@@ -42,17 +112,11 @@ Both production drivers use one common `seed = 1234` for every configuration.
 The daily driver resets that seed before each scene; the yearly driver passes
 the same seed to each period run. Matching planting layouts therefore receive
 the same plant rotations, retained throughout each new growth cycle. Change the
-single `seed` line in a driver to choose another common seed. The temporary repair
-runner continues to replay archived orientations. Reproducibility
+single `seed` line in a driver to choose another common seed. Reproducibility
 requires unchanged code, inputs, package versions and thread count.
 
-The temporary missing-output runner and its instructions live in
-`2_outputs/overnight_scripts/`; they are intentionally excluded from Git.
-It reconstructs archived scene orientations and validates each day against
-retained results before publishing only missing tables into the yearly dataset.
-Existing tables are preserved. Partial tables are explicitly marked incomplete;
-full-cycle readers reject them until repair finishes. Including the runner defines
-functions only; it does not launch.
+Full-cycle readers reject tables explicitly marked incomplete. Plotting requires
+complete saved results and never fills gaps by launching a simulation.
 
 ## Cycle assimilation analysis
 
@@ -64,10 +128,17 @@ the area-integrated exchanges of all active leaf sections; do not sum daily
 cumulative values or average over days. `attach_assimilation_to_yearly_scene`
 attaches these totals to Plant nodes and their organs on verified saved geometry.
 
-The historical `5.8_integrate_year_radiations.jl` and
-`5.9_plot_integrated_light.jl` filenames contain assimilation analysis.
-The integration script writes a small derived CSV under
-`2_outputs/cumulative_assimilation/`; source Parquet remains untouched.
+`5.8_integrate_year_radiations.jl` integrates green-leaf absorbed PAR and signed
+assimilation for configurations 0–3. It uses saved timestep durations and writes
+one row per planting position under `2_outputs/cumulative_appfd/`, together with
+`provenance.toml` recording source hashes, formulas and units. It also writes the
+assimilation-only CSVs under `2_outputs/cumulative_assimilation/`.
+`5.8_plot_cumulative_appfd_3d.jl` shows cumulative leaf-mean absorbed PPFD, total
+absorbed photons and net assimilation, with a shared scale across configurations.
+It refreshes summaries when their source metadata or CSV hashes change.
+The historical `5.9_plot_integrated_light.jl` filename shows assimilation and
+saves `cumulative_assimilation/integrated_assimilation_3d_config_0.png`.
+Source Parquet remains untouched.
 `5.7_plot_year_cumulative_assimilation.jl` materializes three representative
 plant curves per configuration and the complete crop-total curve. DuckDB computes
 the full-cycle sums on disk, with chronological ordering and stable planting IDs.
@@ -221,7 +292,7 @@ in `day_simulation` for a smaller scene during verification. A supplied `meteo`
 table lets several configurations reuse already-read forcing; the runner
 checks coverage and selects each day's rows before calling `day_simulation`.
 
-## Plot yearly faPAR without loading the light CSVs
+## Plot yearly faPAR from saved light outputs
 
 Run `5.6_plot_year_fapar.jl` through Kaimon with `mt=true` for GLMakie. It
 processes configurations 0–3 and writes
@@ -229,13 +300,13 @@ processes configurations 0–3 and writes
 configuration and daily curves for plants, solar panels, ground and their sum.
 The horizontal reference at one helps inspect the radiation balance.
 
-`year_fapar.jl` reads plain or gzip light files sequentially in **32 MiB decompressed input batches**,
-parses five required columns plus any legacy validation columns, and retains
-totals per timestamp. It
-never reads or memory maps the entire light file. Parsed columns and Julia's
-runtime require additional memory; memory use is independent of the full CSV
-size. Source SHA256 and row count are checked against the simulation sidecar
-with a separate bounded scan for the stored-file hash.
+`year_fapar.jl` aggregates Parquet shards by timestamp and geometry category in
+DuckDB, transferring only those small totals to Julia. Legacy plain or gzip
+light files are read sequentially in **32 MiB decompressed input batches**,
+parsing five required columns plus any legacy validation columns. Neither path
+loads the full light table into Julia. Source SHA256 and row count are checked
+against the simulation sidecar, and invalid values, unknown geometry and
+inconsistent timestamps are rejected.
 
 For category `g`, absorbed energy is
 `sum(Ra_PAR_f * area * duration_s)` over its geometric objects and timesteps.
@@ -255,10 +326,13 @@ that difference; it is not an independently measured reflected-energy budget.
 
 Small `fapar_hourly_config_ID.csv` and `fapar_daily_config_ID.csv` tables retain
 energies in joules and fractions, and `fapar_info_config_ID.toml` records the
-source hash. Sky forcing is reconstructed with the same `archimed_meteo` path
-as the simulation, assuming the climate file and preparation code have not
-changed. To use an archived run's exact prepared forcing, supply its table
-explicitly:
+source hash and incoming-forcing provenance. Prepared forcing saved alongside
+the run is used automatically. Its provenance remains relevant: forcing marked
+as reconstructed is not an archive of the original simulation forcing.
+For legacy runs without saved forcing, sky forcing is reconstructed with the
+same `archimed_meteo` path as the simulation, assuming the climate file and
+preparation code have not changed. To override that choice with an archived
+run's exact prepared forcing, supply its table explicitly:
 
 ```julia
 include("1_code/year_fapar.jl")
@@ -320,7 +394,7 @@ checks it against the rebuilt scene's Plant placement IDs.
 For plotting, execute with `mt=true`:
 
 ```julia
-include("1_code/5.2_plot_day_simulation.jl")
+include("1_code/daily_plotting.jl")
 f, ax, p = plot_output(saved.scene.mtg, saved.leaves;
     variable=:A, timestep=13)
 
@@ -353,7 +427,7 @@ attach_outputs!(result.scene.mtg, result.light;
 The plotting helper activates GLMakie:
 
 ```julia
-include("1_code/5.2_plot_day_simulation.jl")
+include("1_code/daily_plotting.jl")
 f, ax, p = plot_output(result.scene.mtg, result.leaves;
     variable=:A, timestep=13, label="Net assimilation (μmol CO₂ m⁻² s⁻¹)")
 f, ax, p = plot_output(result.scene.mtg, result.light;
@@ -573,8 +647,7 @@ checked finite values and the electron-transport upper bound around compensation
 The full scenario passed authoring validation. These are numerical and structural
 checks, not calibration against observations. Plant tables and a leaf time series from the verification run are
 in `2_outputs/validation/2026-10-06-output-collection-g0-1e-6/` (ignored generated
-data). The earlier verification with the temporary wrapper remains archived
-in `2_outputs/validation/2026-10-06-output-collection/`.
+data).
 Examples with the new node-ID tables are in
 `2_outputs/validation/2026-10-06-node-outputs/`: plant outputs, all 24 hours for
 one plant's leaf sections, a ground-light snapshot, metrics, and rendered

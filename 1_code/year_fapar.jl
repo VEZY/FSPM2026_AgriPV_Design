@@ -48,12 +48,63 @@ function _fapar_accumulate!(absorbed, counts, lookup, expected_steps, config_id,
     return nothing
 end
 
+# Keep large Parquet tables inside DuckDB. Only one small aggregate per timestamp
+# and geometry group is transferred to Julia, with the same validation as CSV.
+function _fapar_parquet_accumulate!(absorbed, counts, lookup, expected_steps,
+    config_id, input_dir, light_info; verify_hash=true)
+    paths = _agripv_saved_files(input_dir, light_info; verify_hash)
+    return _agripv_with_db() do con
+        scan = _agripv_parquet_scan(paths)
+        columns = propertynames(DataFrame(DBInterface.execute(con, "SELECT * FROM $scan LIMIT 0")))
+        required = [:datetime, :plant_id, :scale, :Ra_PAR_f, :area]
+        isempty(setdiff(required, columns)) ||
+            throw(ArgumentError("Light Parquet is missing required columns $(setdiff(required, columns))."))
+        invalid_day = :day in columns ? "day IS NULL OR CAST(day AS DATE) <> CAST(datetime AS DATE)" : "FALSE"
+        invalid_config = :config_id in columns ? "config_id IS NULL OR config_id <> $(Int(config_id))" : "FALSE"
+        step_summary = :timestep in columns ?
+            "min(timestep) AS first_step, max(timestep) AS last_step, count(*) FILTER (WHERE timestep IS NULL) AS missing_steps" :
+            "NULL AS first_step, NULL AS last_step, 0 AS missing_steps"
+        table = DataFrame(DBInterface.execute(con, """
+            SELECT datetime, geometry_group, count(*) AS source_rows,
+                sum(Ra_PAR_f * area) AS absorbed_W,
+                count(*) FILTER (WHERE Ra_PAR_f IS NULL OR area IS NULL
+                    OR NOT isfinite(Ra_PAR_f) OR NOT isfinite(area)
+                    OR Ra_PAR_f < 0 OR area < 0) AS invalid_values,
+                count(*) FILTER (WHERE ($invalid_day) OR ($invalid_config)) AS invalid_metadata,
+                $step_summary
+            FROM (SELECT *, CASE WHEN plant_id IS NOT NULL THEN 1
+                WHEN scale = 'Panel' THEN 2 WHEN scale = 'Cobblestone' THEN 3
+                ELSE 0 END AS geometry_group FROM $scan)
+            GROUP BY datetime, geometry_group ORDER BY datetime, geometry_group
+            """))
+        nrows = 0
+        for row in eachrow(table)
+            stamp = row.datetime
+            ismissing(stamp) && throw(ArgumentError("Missing datetime in light results."))
+            index = get(lookup, stamp, 0)
+            index > 0 || throw(ArgumentError("No incoming forcing for light timestamp $stamp."))
+            row.invalid_values == 0 && !ismissing(row.absorbed_W) && isfinite(row.absorbed_W) ||
+                throw(ArgumentError("Invalid Ra_PAR_f or area at $stamp."))
+            row.invalid_metadata == 0 && row.missing_steps == 0 &&
+                (:timestep ∉ columns ||
+                    (row.first_step == expected_steps[index] && row.last_step == expected_steps[index])) ||
+                throw(ArgumentError("Inconsistent light date, timestep or configuration at $stamp."))
+            1 <= row.geometry_group <= 3 ||
+                throw(ArgumentError("Unclassified non-plant light geometry at $stamp."))
+            absorbed[row.geometry_group, index] += row.absorbed_W
+            counts[row.geometry_group, index] += row.source_rows
+            nrows += row.source_rows
+        end
+        return nrows
+    end
+end
+
 """
     summarize_year_fapar(; config_id, input_dir=..., batch_bytes=32*1024^2,
         forcing=nothing, verify_hash=true)
 
-Read Parquet shards in bounded row batches, or compact/legacy light CSV in
-bounded byte batches.
+Aggregate Parquet shards in DuckDB, or read compact/legacy light CSV in bounded
+byte batches. Parquet transfers only timestamp/group summaries to Julia.
 Gzip is decompressed as a stream, including appended daily gzip members.
 Require its `scene_config_ID.toml` sidecar. Return small `hourly` and `daily`
 DataFrames, plus row count and source SHA256. No full-file read or memory map
@@ -99,6 +150,9 @@ function summarize_year_fapar(; config_id,
         areas[day] = surface
     end
     Set(keys(areas)) == Set(Date.(metadata["days"])) || throw(ArgumentError("Saved scene dates differ from period dates."))
+    incoming_source = isnothing(forcing) ? (haskey(metadata, "forcing") ?
+        get(metadata, "forcing_provenance", "saved prepared forcing") :
+        "current project climate and archimed_meteo sky preparation") : "caller-provided prepared forcing"
     forcing = isnothing(forcing) ? (haskey(metadata, "forcing") ?
         _agripv_read_parquet(input_dir, metadata["forcing"]; verify_hash) : _year_fapar_forcing(metadata)) : forcing
     rows = sort!(collect(Tables.rows(forcing)); by=row -> DateTime(row.date))
@@ -131,15 +185,8 @@ function summarize_year_fapar(; config_id,
     nrows = 0
     last_report = time()
     if parquet
-        foreach_saved_output_batch(; config_id, table=:light, input_dir, verify_hash) do table
-            columns = propertynames(table)
-            _fapar_accumulate!(absorbed, counts, lookup, expected_steps, config_id,
-                table.datetime, :day in columns ? table.day : nothing,
-                :timestep in columns ? table.timestep : nothing,
-                :config_id in columns ? table.config_id : nothing,
-                table.plant_id, table.scale, table.Ra_PAR_f, table.area)
-            nrows += nrow(table)
-        end
+        nrows = _fapar_parquet_accumulate!(absorbed, counts, lookup, expected_steps,
+            config_id, input_dir, light_info; verify_hash)
     else
     _agripv_open_light(path) do io
         header = readline(io; keep=true)
@@ -171,7 +218,7 @@ function summarize_year_fapar(; config_id,
     end
     source_sha256 = parquet ? bytes2hex(SHA.sha256(join(x["sha256"] for x in light_info["files"]))) : bytes2hex(open(SHA.sha256, path))
     !parquet && verify_hash && source_sha256 != light_info["sha256"] && throw(ArgumentError("Light CSV hash differs from the saved simulation."))
-    nrows == light_info["rows"] || throw(ArgumentError("Light CSV row count differs from its saved metadata."))
+    nrows == light_info["rows"] || throw(ArgumentError("Light output row count differs from its saved metadata."))
     all(>(0), vec(sum(counts; dims=1))) || throw(ArgumentError("Some forcing timesteps have no light rows."))
     hourly = DataFrame(config_id=fill(config_id, length(stamps)), day=Date.(stamps),
         datetime=stamps, timestep=expected_steps, duration_s=seconds, incoming_PAR_J=incoming)
@@ -191,5 +238,5 @@ function summarize_year_fapar(; config_id,
         end
         table.nonabsorbed_fraction = 1 .- table.fapar_total
     end
-    return (; hourly, daily, rows=nrows, source_sha256)
+    return (; hourly, daily, rows=nrows, source_sha256, incoming_source)
 end

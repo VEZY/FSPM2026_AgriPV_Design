@@ -47,6 +47,22 @@ function save_fixture(directory, table; rows=nrow(table), sha=nothing)
     return digest
 end
 
+function save_parquet_fixture(directory, table)
+    save_fixture(directory, table)
+    files = _agripv_write_parquet(table, joinpath(directory, "light");
+        day=first(DAYS), batch_rows=3)
+    for file in files
+        file["file"] = joinpath("light", file["file"])
+    end
+    metadata_path = joinpath(directory, "scene_config_$(CONFIG_ID).toml")
+    metadata = TOML.parsefile(metadata_path)
+    metadata["tables"]["light"] = _agripv_parquet_info(files)
+    open(metadata_path, "w") do io
+        TOML.print(io, metadata)
+    end
+    return metadata
+end
+
 const YEAR_FAPAR_TEST_RESULT = @testset "Yearly PAR capture uses energy and scene area" begin
     mktempdir() do directory
         (; table, forcing) = fapar_fixture()
@@ -88,6 +104,49 @@ const YEAR_FAPAR_TEST_RESULT = @testset "Yearly PAR capture uses energy and scen
         tabular = summarize_year_fapar(; config_id=CONFIG_ID, input_dir=directory,
             forcing=DataFrame(forcing), batch_bytes=73)
         @test isequal(tabular.hourly, hourly) && isequal(tabular.daily, daily)
+
+        # SQL aggregation must preserve energy fractions, geometry groups and
+        # strict validation independently of shard and CSV batching boundaries.
+        save_parquet_fixture(directory, table)
+        parquet = summarize()
+        @test isequal(parquet.hourly, hourly)
+        @test isequal(parquet.daily, daily)
+        @test parquet.rows == result.rows
+        @test parquet.incoming_source == "caller-provided prepared forcing"
+        compact_parquet = DataFrames.select(table, :datetime, :plant_id, :scale, :Ra_PAR_f, :area)
+        save_parquet_fixture(directory, compact_parquet)
+        @test isequal(summarize().hourly, hourly)
+        for change! in (t -> t.scale[4] = "Unknown", t -> t.scale[4] = missing,
+            t -> t.Ra_PAR_f[1] = NaN, t -> t.area[1] = Inf,
+            t -> t.Ra_PAR_f[1] = -1, t -> t.area[1] = -1,
+            t -> t.Ra_PAR_f[1] = missing, t -> t.area[1] = missing,
+            t -> t.datetime[1] = missing, t -> t.datetime[1] += Minute(1),
+            t -> t.day[1] = DAYS[2], t -> t.timestep[1] = 2,
+            t -> t.config_id[1] = 999)
+            malformed = copy(table)
+            change!(malformed)
+            save_parquet_fixture(directory, malformed)
+            @test_throws ArgumentError summarize()
+        end
+        save_parquet_fixture(directory, DataFrames.select(table, Not(:area)))
+        @test_throws ArgumentError summarize()
+        parquet_metadata = save_parquet_fixture(directory, table)
+        metadata_path = joinpath(directory, "scene_config_$(CONFIG_ID).toml")
+        for bad_info in (Dict("rows" => nrow(table) + 1), Dict("complete" => false))
+            malformed = deepcopy(parquet_metadata)
+            merge!(malformed["tables"]["light"], bad_info)
+            open(metadata_path, "w") do io
+                TOML.print(io, malformed)
+            end
+            @test_throws ArgumentError summarize()
+        end
+        parquet_metadata["tables"]["light"]["files"][1]["sha256"] = repeat("0", 64)
+        open(metadata_path, "w") do io
+            TOML.print(io, parquet_metadata)
+        end
+        @test_throws ArgumentError summarize()
+        @test isequal(summarize(; verify_hash=false).hourly, hourly)
+        save_fixture(directory, table)
 
         # Compact export: each day's append is a separate gzip member.
         compact = copy(table)

@@ -7,14 +7,20 @@ _agripv_hash(path) = bytes2hex(open(SHA.sha256, path))
 function _agripv_with_db(f; memory_limit="1GB")
     db = DuckDB.DB()
     con = DBInterface.connect(db)
+    temporary_dir = mktempdir()
     try
         DBInterface.execute(con, "SET memory_limit=$(_agripv_sql_string(memory_limit))")
+        DBInterface.execute(con, "SET temp_directory=$(_agripv_sql_string(temporary_dir))")
         # DuckDB.jl reserves Julia threads for scans of registered Julia tables.
         DBInterface.execute(con, "SET threads=$(Threads.nthreads())")
         return f(con)
     finally
-        DBInterface.close!(con)
-        DBInterface.close!(db)
+        try
+            DBInterface.close!(con)
+            DBInterface.close!(db)
+        finally
+            rm(temporary_dir; recursive=true, force=true)
+        end
     end
 end
 
