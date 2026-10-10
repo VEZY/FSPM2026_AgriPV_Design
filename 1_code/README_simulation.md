@@ -10,11 +10,14 @@ include("1_code/5_regenerate_plots.jl")
 regenerate_saved_plots()
 # Or regenerate a subset:
 regenerate_saved_plots(; groups=(:daily, :assimilation))
+# Select another retained day for figures 5.4 and 5.5:
+regenerate_saved_plots(; groups=(:daily,), assimilation_day=Date(2025, 5, 15))
 ```
 
-This runs the configuration views in `4.0` and figures `5.1`–`5.9` from the
-retained results and refreshes the small cumulative summaries. It does not invoke
-a simulation. Daily figures use the 2 July snapshot in the yearly dataset;
+This runs the configuration views in `4.0`, figures `5.1`–`5.9`, and the tables
+in `5.10` from the retained results and refreshes the small cumulative summaries.
+It does not invoke a simulation. Daily assimilation figures `5.4`/`5.5` default
+to 15 May 2025; other daily figures use the 2 July snapshot in the yearly dataset;
 annual figures use the complete saved
 cycle. The historical `5.1` filename now shows saved absorbed PAR instead of
 computing a new static light simulation. The individual plotting functions
@@ -30,7 +33,48 @@ configuration; daily MTG `node_id` values can change as plants grow. Derived
 cumulative CSVs have a checksum manifest and are refreshed when the saved
 metadata changes. Missing outputs or mismatched identities stop plotting.
 Figures are written under `2_outputs/`, including `fapar/`,
-`cumulative_appfd/` and `cumulative_assimilation/`.
+`cumulative_appfd/`, `cumulative_assimilation/` and `period_summary/`.
+
+The experiment's requested figures are:
+
+| Requested result | Numbered script | Output |
+|---|---|---|
+| Configurations from above, South down | `4.0_show_config.jl` | `configurations_top.png`, `config_ID_top.png` |
+| 15 May assimilation per saved step, individual plants and red means | `5.5_plot_day_assimilation_step.jl` | `day_step_assimilation_per_config_2025-05-15.png` |
+| 15 May within-day cumulative assimilation, individual plants and red means | `5.4_plot_day_assimilation.jl` | `day_cumulative_assimilation_per_config_2025-05-15.png` |
+| Complete-period cumulative assimilation per plant | `5.7_plot_year_cumulative_assimilation.jl` | `year_cumulative_assimilation_per_plant.png` |
+| Complete-period assimilation on the last saved 3D scene | `5.8_plot_cumulative_appfd_3d.jl` with `quantity=:assimilation` | `cumulative_appfd/cumulative_net_assimilation_3d_crop.png`, `cumulative_net_assimilation_3d_with_panels.png` |
+| One complete-period table per configuration | `5.10_summarize_period.jl` | `period_summary/config_ID.csv`, `config_ID.md`, `comparison.csv` |
+
+Daily assimilation facets use AlgebraOfGraphics, common x/y scales, one legend,
+every individual plant and each configuration's arithmetic mean in red. Dated
+filenames preserve the selected date; the established undated aliases are also
+updated. Annual curves sum every signed `assimilation_step` by persistent
+`plant_instance_id` across all saved days. The daily-reset cumulative column
+does not enter this calculation. Curves retain daily endpoints after integrating
+all hourly steps. The current saved period is 4 March–2 July 2025 (121 days),
+not a full calendar year.
+
+The four period tables report net assimilation (mol CO₂), absorbed PAR energy
+(J), transpiration and signed net water exchange (kg H₂O), both as configuration
+totals and totals divided by the actual number of plants. Assimilation and
+transpiration step amounts already contain their duration and are summed once.
+PAR energy sums `Ra_PAR_f * area * duration_s` over all plant organs, including
+senescent leaves and stems; panels and ground are excluded. Water rates use each
+saved timestep duration. Condensation is not a separate reported quantity.
+Leaf temperatures (°C) have an area × time weighted mean and minimum/maximum
+over positive-area green leaves; temperatures are neither summed nor divided
+by the planting population. Every table records units, scope and formulas.
+
+Tables validate source checksums, timestamps, persistent identities and actual
+populations, and save a checksum manifest with forcing provenance. All-organ
+PAR is validated and integrated one saved day at a time to keep memory bounded;
+the daily amounts are then summed across the complete period. The current
+forcing archives are labelled `reconstructed`; that label is preserved. The
+saved layouts contain 1,376 plants in configurations 0/1 and 1,353 in 2/3,
+despite equal 5.25 m² domains and the same target density of 268 plants m⁻².
+Rounding the number of rows and flooring the positions per row produce these
+different actual populations. Derived comparisons use each actual count.
 
 The plotting readers and aggregates have a separate synthetic-output test suite
 that does not run simulations. It also checks signed all-plant assimilation,
@@ -58,11 +102,14 @@ and three translucent copies (`repeat_alpha=0.18`). Repeated foliage is also
 desaturated and uses lower opacity so overlapping leaves do not obscure the
 simulated canopy.
 `2_outputs/configurations_repeated.png` combines the four repeated designs.
+`2_outputs/configurations_top.png` and `config_ID_top.png` add orthographic
+views from above (89.9° elevation), with geographic North up, South down and
+East right. These views show the original simulated cell without repetitions.
 Only the simulated cell has a bounding box. Copy spacing comes from the exact
 `scene.scene_xy_bounds` periods; axes remain in local scene coordinates, while
-titles give the saved scene rotation. Every 3D plotting path uses the same
-geographic southwest viewpoint and marks geographic south with an arrow pointing
-toward the lower right. Translucent copies remain behind the simulated cell,
+titles give the saved scene rotation. The three-quarter plotting paths use the
+same geographic southwest viewpoint and mark geographic south with an arrow
+pointing toward the lower right. Translucent copies remain behind the simulated cell,
 on the upper side of the image, with offsets derived from the camera direction.
 ArchimedLight rotates sky directions into the unchanged local mesh coordinates:
 for a saved rotation θ, local north is `(sin(θ), cos(θ), 0)`, south is its

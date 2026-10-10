@@ -23,6 +23,19 @@ const DAILY_PLOTTING_TEST_RESULT = @testset "Saved daily plotting contracts" beg
     invalid.assimilation_step[1] = NaN
     @test_throws ArgumentError _validate_plot_plant_series(invalid, :assimilation_step)
 
+    # Cumulative values integrate signed steps chronologically, retaining an
+    # explicitly supplied nonzero starting baseline for each plant.
+    cumulative = DataFrame(plant_id=[10, 20, 10, 20, 10, 20],
+        datetime=repeat([DateTime(day), DateTime(day) + Hour(1), DateTime(day) + Hour(2)]; inner=2),
+        assimilation_step=[-2.0, -3.0, 6.0, 10.0, -1.0, 4.0],
+        assimilation_cumulative=[3.0, -3.0, 9.0, 7.0, 8.0, 11.0])
+    @test _validate_day_cumulative_assimilation(reverse(cumulative)) isa DataFrame
+    @test cumulative.assimilation_cumulative == [3.0, -3.0, 9.0, 7.0, 8.0, 11.0]
+    incorrect_cumulative = copy(cumulative)
+    incorrect_cumulative.assimilation_cumulative[3] += 1.0
+    @test_throws ArgumentError _validate_day_cumulative_assimilation(incorrect_cumulative)
+    @test_throws ArgumentError plot_saved_day_assimilation(; variable=:A_plant)
+
     @test _output_plot_range(DataFrame(timestep=[1, 1], A=[0.0, 0.0]), :A, 1) == (0.0, 1.0)
     @test _output_plot_range(DataFrame(timestep=[1, 1], A=[-2.0, 6.0]), :A, 1) == (-2.0, 6.0)
     @test _agripv_plot_hours([DateTime(day) + Hour(1), DateTime(day) + Minute(90)], day) == [1.0, 1.5]

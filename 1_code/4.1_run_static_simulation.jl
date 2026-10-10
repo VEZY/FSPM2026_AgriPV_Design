@@ -38,7 +38,7 @@ options = LightOptions(
     cache_radiation=false,
 )
 
-for configID in configIDs
+for configID in configIDs # configID = 0
     config = get_pvconfig(configID)
 
     # The phenological stage of plants is determined by the `day` parameter of `agripv_scene()`. Default value is Date(2025, 6, 25)
@@ -60,5 +60,5 @@ for configID in configIDs
 
     @time stps = run_light(sim, sky; step_duration_seconds=1800.0) # 177.779756 seconds for the full scene with scattering
 
-    @time write_component_values("2_outputs/simulations/static/results_config$configID.csv", sim, stps)
+    # @time write_component_values("2_outputs/simulations/static/results_config$configID.csv", sim, stps)
 end

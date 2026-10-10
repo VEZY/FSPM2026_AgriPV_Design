@@ -3,3 +3,4 @@
 include("configuration_plotting.jl")
 
 configuration_figures = plot_configurations()
+configuration_top_figures = plot_configuration_topviews()

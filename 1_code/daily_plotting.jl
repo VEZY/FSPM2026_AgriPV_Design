@@ -2,6 +2,7 @@ using CSV, DataFrames, Dates, Statistics, TOML
 using GLMakie, PlantGeom
 isdefined(@__MODULE__, :load_day_outputs) || include("saved_simulation.jl")
 isdefined(@__MODULE__, :agripv_cardinal_arrow!) || include("scene_orientation.jl")
+isdefined(@__MODULE__, :plot_assimilation_facets) || include("assimilation_plotting.jl")
 
 """Find the saved daily or growth-period recipe for one configuration and day."""
 function _agripv_plot_day_metadata(config_id, day, input_dir)
@@ -64,15 +65,35 @@ function _validate_plot_plant_series(table, variable)
     return table
 end
 
+"""Check the saved within-day cumulative column against signed step amounts."""
+function _validate_day_cumulative_assimilation(table)
+    _validate_plot_plant_series(table, :assimilation_step)
+    _validate_plot_plant_series(table, :assimilation_cumulative)
+    for plant in groupby(table, :plant_id)
+        ordered = sort(plant, :datetime)
+        expected = cumsum(ordered.assimilation_step)
+        # A run can explicitly declare a nonzero baseline. It must remain the
+        # same offset throughout this plant's selected day.
+        baseline = first(ordered.assimilation_cumulative) - first(expected)
+        all(isapprox.(ordered.assimilation_cumulative, expected .+ baseline;
+            rtol=1e-9, atol=1e-6)) || throw(ArgumentError(
+            "Saved daily cumulative assimilation differs from the sum of signed steps for plant $(first(plant.plant_id))."))
+    end
+    return table
+end
+
 """Read signed plant assimilation for one day across saved configurations."""
 function saved_day_plant_series(; day=Date(2025, 7, 2), config_ids=0:3,
     variable=:assimilation_cumulative, input_dir=_agripv_yearly_output_dir(), verify_hash=true)
     tables = DataFrame[]
     timestamps = nothing
     for config_id in config_ids
+        variables = variable == :assimilation_cumulative ?
+            (:assimilation_cumulative, :assimilation_step) : (variable,)
         table = load_plot_day_table(; config_id, day, table=:plants, input_dir,
-            variables=(variable,), verify_hash)
+            variables, verify_hash)
         _validate_plot_plant_series(table, variable)
+        variable == :assimilation_cumulative && _validate_day_cumulative_assimilation(table)
         current = sort!(unique(table.datetime))
         if isnothing(timestamps)
             timestamps = current
@@ -209,28 +230,12 @@ _agripv_plot_hours(stamps, day) = Dates.value.(DateTime.(stamps) .- DateTime(day
 
 """Draw individual plant trajectories and their mean in one panel per configuration."""
 function plot_daily_plant_panels(table; variable, day, ylabel, title)
-    means = daily_config_mean(table, variable)
-    configs = sort!(unique(table.config_id))
-    ncols = min(2, length(configs))
-    figure = Figure(size=(900, 700))
-    Label(figure[0, 1:ncols], "$title — $day"; fontsize=20)
-    for column in 1:ncols
-        colsize!(figure.layout, column, Makie.Relative(1 / ncols))
-    end
-    for (index, config_id) in enumerate(configs)
-        row, column = (index - 1) ÷ 2 + 1, (index - 1) % 2 + 1
-        axis = Axis(figure[row, column]; title="Config $config_id", xlabel="Hour", ylabel, xticks=0:2:24)
-        subset = filter(:config_id => ==(config_id), table)
-        for plant in groupby(subset, :plant_id)
-            lines!(axis, _agripv_plot_hours(plant.datetime, day), plant[!, variable]; color=(:black, 0.05))
-        end
-        average = filter(:config_id => ==(config_id), means)
-        lines!(axis, _agripv_plot_hours(average.datetime, day), average.value_mean;
-            color=:red, linewidth=3, label="Mean")
-        autolimits!(axis)
-        xlims!(axis, 0, 24)
-    end
-    return figure
+    plotted = DataFrames.select(table, :config_id, :plant_id, :datetime, variable)
+    plotted.hour = _agripv_plot_hours(plotted.datetime, day)
+    result = plot_assimilation_facets(plotted; x=:hour, y=variable,
+        config=:config_id, plant=:plant_id, xlabel="Hour", ylabel,
+        title="$title — $day", axis=(; xticks=0:2:24, limits=((0, 24), nothing)))
+    return result.figure
 end
 
 function plot_daily_config_means(table; variable, day, ylabel, title)
@@ -246,6 +251,55 @@ function plot_daily_config_means(table; variable, day, ylabel, title)
     xlims!(axis, 0, 24)
     axislegend(axis; position=:lt)
     return figure
+end
+
+"""
+    plot_saved_day_assimilation(; day=Date(2025, 5, 15),
+        variable=:assimilation_cumulative, config_ids=0:3, input_dir=...,
+        output_dir=..., verify_hash=true, legacy_aliases=true)
+
+Regenerate one day's retained `assimilation_step` or `assimilation_cumulative`
+figures without running the model. Stored plant values are μmol CO₂/plant:
+`assimilation_step` already includes the actual timestep duration, and the
+growth-period export resets `assimilation_cumulative` at the start of each day.
+
+Save dated configuration facets (individual plants and red arithmetic means,
+shared x/y scales and one legend) and a configuration-mean comparison. Optional
+legacy filename aliases preserve the numbered scripts' established outputs.
+Return the selected day, variable and output paths; no scene is reconstructed.
+"""
+function plot_saved_day_assimilation(; day=Date(2025, 5, 15),
+    variable=:assimilation_cumulative, config_ids=0:3,
+    input_dir=_agripv_yearly_output_dir(),
+    output_dir=joinpath(_agripv_project_root(), "2_outputs"),
+    verify_hash=true, legacy_aliases=true)
+    variable in (:assimilation_step, :assimilation_cumulative) ||
+        throw(ArgumentError("Select assimilation_step or assimilation_cumulative."))
+    day = Date(day)
+    table = saved_day_plant_series(; day, variable, config_ids, input_dir, verify_hash)
+    cumulative = variable == :assimilation_cumulative
+    quantity = cumulative ? "cumulative" : "step"
+    ylabel = cumulative ? "Within-day cumulative assimilation (μmol CO₂ plant⁻¹)" :
+        "Net assimilation per step (μmol CO₂ plant⁻¹)"
+    title = cumulative ? "Within-day cumulative net assimilation per plant" :
+        "Net assimilation per plant per saved step"
+    facets = plot_daily_plant_panels(table; day, variable, ylabel, title)
+    means = plot_daily_config_means(table; day, variable, ylabel,
+        title=cumulative ? "Mean within-day cumulative net assimilation" : "Mean net assimilation per step")
+    mkpath(output_dir)
+    files = String[]
+    for (suffix, figure) in (("per_config", facets), ("means", means))
+        stem = "day_$(quantity)_assimilation_$(suffix)"
+        dated = joinpath(output_dir, "$(stem)_$(day).png")
+        save(dated, figure; px_per_unit=3.0)
+        push!(files, dated)
+        if legacy_aliases
+            alias = joinpath(output_dir, "$(stem).png")
+            cp(dated, alias; force=true)
+            push!(files, alias)
+        end
+    end
+    return (; day, variable, files)
 end
 
 function _output_plot_range(table, variable, timestep)

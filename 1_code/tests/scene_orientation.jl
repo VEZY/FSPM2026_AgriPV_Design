@@ -37,6 +37,27 @@ const SCENE_ORIENTATION_TEST_RESULT = @testset "Geographic orientation of saved 
         @test sum(south .* toward_viewer) > 0
     end
 
+    # Validate the new top view against Makie's actual lookat matrix: North
+    # must project upward, South downward and East right for every rotation.
+    top_camera = _configuration_camera(:top)
+    for rotation in (0.0, 90.0, 180.0, 270.0, -32.0)
+        phi = agripv_local_camera_azimuth(rotation;
+            geographic_azimuth_deg=top_camera.geographic_azimuth_deg)
+        elevation = top_camera.elevation
+        eye = Vec3d(cos(elevation) * cos(phi), cos(elevation) * sin(phi), sin(elevation))
+        view = GLMakie.Makie.lookat(eye, Vec3d(0), Vec3d(0, 0, 1))
+        cardinal = agripv_local_cardinal_directions(rotation)
+        projected_south = view * [cardinal.south..., 0.0]
+        projected_north = view * [cardinal.north..., 0.0]
+        projected_east = view * [cardinal.east..., 0.0]
+        @test abs(projected_south[1]) < 1e-12
+        @test projected_south[2] < 0
+        @test projected_north[2] > 0
+        @test projected_east[1] > 0
+        @test abs(projected_east[2]) < 1e-12
+    end
+    @test_throws ArgumentError _configuration_camera(:unsupported)
+
     recipe = Dict(:agripv_scene_recipe => Dict("config" => Dict("panel_orientation" => 90.0)))
     @test agripv_scene_rotation_deg(recipe) == 90.0
     @test_throws ArgumentError agripv_scene_rotation_deg(Dict(:agripv_scene_recipe => nothing))

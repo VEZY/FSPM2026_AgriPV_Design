@@ -85,8 +85,11 @@ end
 
 Four 3D configurations with one shared scale. Select :appfd (mol photons/m²
 green leaf area), :photons (mol photons/plant), or :assimilation (mol CO₂/plant).
-The colors show the time integral of each plant's green-leaf-area-weighted
-absorbed PPFD on one saved day's geometry. Run via Kaimon with `mt=true`.
+The colors show the selected integral on one saved day's geometry. For
+`:assimilation`, sum every signed plant `assimilation_step` over the complete
+period; the daily cumulative column is not used. For `:appfd` and `:photons`,
+use absorbed PAR on active green leaves, with the saved timestep durations.
+By default the geometry is the last saved day. Run via Kaimon with `mt=true`.
 """
 function plot_cumulative_appfd_3d(;
     input_dir=normpath(joinpath(@__DIR__, "..", "2_outputs", "simulations", "yearly")),
