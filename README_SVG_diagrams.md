@@ -7,7 +7,7 @@ This directory contains two SVG diagrams illustrating the repository's STICS, Ar
 1. `crop_model_integration.svg` - High-level view of the crop-to-simulation workflow and its outputs.
 2. `detailed_integration.svg` - Repository-level view of component inputs, exchanged data, and output files.
 
-Solid arrows show the main processing sequence. The dashed green arrow shows the absorbed-light (`aPPFD`) input passed from ArchimedLight to PlantBioPhysics. There are no feedback-loop arrows: the daily and yearly simulation drivers run the coupled light and physiology models downstream of the STICS-driven plant growth.
+Solid arrows show the main processing sequence. Dashed green arrows show the `aPPFD` input passed from ArchimedLight to PlantBiophysics and the forced-growth relationship, with no feedback from light simulations. Dotted blue arrows show meteorological forcing to STICS, ArchimedLight, and PlantBiophysics.
 
 ## Creation Process
 
@@ -22,6 +22,8 @@ The workflow shown is:
 4. ArchimedLight calculates light absorption and provides `aPPFD` to PlantBioPhysics.
 5. PlantBioPhysics models leaf physiology and energy balance, then aggregates plant summaries.
 6. The simulation writes leaf, light, and plant CSV tables plus a scene recipe.
+
+The detailed diagram's wheat thumbnails use OBJ/MTL pairs from 2025-04-13, 2025-05-23, and 2025-07-02. Matching transparent PNG renders in `growth_stage_images/` can also be used individually in presentations.
 
 ## Last Updated
 

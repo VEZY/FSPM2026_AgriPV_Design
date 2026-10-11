@@ -24,7 +24,7 @@ function plot_radar_grid!(axis)
         -0.06;
         text=string(radial_min),
         align=(:right, :top),
-        fontsize=10,
+        fontsize=14,
         color=:gray35,
     )
     for tick_value in (1.25, 1.5, radial_max)
@@ -34,7 +34,7 @@ function plot_radar_grid!(axis)
             radius .* cos.(ring_angles),
             radius .* sin.(ring_angles);
             color=:gray75,
-            linewidth=1,
+            linewidth=2,
         )
         text!(
             axis,
@@ -42,7 +42,7 @@ function plot_radar_grid!(axis)
             -radius / sqrt(2);
             text=string(tick_value),
             align=(:right, :center),
-            fontsize=10,
+            fontsize=14,
             color=:gray35,
         )
     end
@@ -53,7 +53,7 @@ function plot_radar_grid!(axis)
             [0, 2 * cos(angle)],
             [0, 2 * sin(angle)];
             color=:gray65,
-            linewidth=1,
+            linewidth=2,
         )
     end
 end
@@ -75,7 +75,7 @@ function plot_radar_series!(axis, values, color, label)
         axis,
         vcat(points, points[1:1]);
         color,
-        linewidth=3,
+        linewidth=4,
         label,
     )
     scatter!(axis, points; color, markersize=12)
@@ -89,7 +89,7 @@ function plot_config_labels!(axis)
             2.25 * sin(angle);
             text=label,
             align=(:center, :center),
-            fontsize=13,
+            fontsize=17,
         )
     end
 end
