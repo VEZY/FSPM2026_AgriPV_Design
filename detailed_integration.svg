@@ -1,653 +1,118 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   width="900"
-   height="700"
-   version="1.1"
-   id="svg57"
-   sodipodi:docname="detailed_integration.svg"
-   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg">
-  <sodipodi:namedview
-     id="namedview57"
-     pagecolor="#ffffff"
-     bordercolor="#000000"
-     borderopacity="0.25"
-     inkscape:showpageshadow="2"
-     inkscape:pageopacity="0.0"
-     inkscape:pagecheckerboard="0"
-     inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="1.6738517"
-     inkscape:cx="427.45722"
-     inkscape:cy="288.55603"
-     inkscape:window-width="1920"
-     inkscape:window-height="991"
-     inkscape:window-x="-9"
-     inkscape:window-y="-9"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg57"
-     showgrid="false" />
-  <!-- Definitions -->
-  <defs
-     id="defs3">
-    <style
-       type="text/css"
-       id="style1"><![CDATA[
-      .box {
-        fill: #F8F9FA;
-        stroke: #DEE2E6;
-        stroke-width: 1.5;
-        rx: 8;
-        ry: 8;
-      }
-      .box-header {
-        fill: #E9ECEF;
-      }
-      .box-title {
-        fill: #495057;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        text-anchor: middle;
-      }
-      .box-content {
-        fill: #212529;
-        font-family: 'Courier New', monospace;
-        font-size: 11px;
-        text-anchor: start;
-      }
-      .connection {
-        fill: none;
-        stroke: #6C757D;
-        stroke-width: 1.5;
-        marker-end: url(#arrow);
-      }
-      .data-flow {
-        fill: none;
-        stroke: #28A745;
-        stroke-width: 2;
-        stroke-dasharray: 6, 3;
-        marker-end: url(#arrow-data);
-      }
-      .feedback {
-        fill: none;
-        stroke: #FD7E14;
-        stroke-width: 1.5;
-        stroke-dasharray: 3, 3;
-        marker-end: url(#arrow-feedback);
-      }
-      .label {
-        fill: #495057;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 12px;
-      }
-      .title {
-        fill: #212529;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 20px;
-        font-weight: bold;
-        text-anchor: middle;
-      }
-      .subtitle {
-        fill: #6C757D;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 14px;
-        text-anchor: middle;
-      }
-      .icon {
-        width: 24px;
-        height: 24px;
-      }
-    ]]></style>
-    <!-- Arrowheads -->
-    <marker
-       id="arrow"
-       markerWidth="8"
-       markerHeight="6"
-       refX="8"
-       refY="3"
-       orient="auto">
-      <polygon
-         points="0 0, 8 3, 0 6"
-         fill="#6C757D"
-         id="polygon1" />
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="800" viewBox="0 0 1100 800" role="img" aria-labelledby="title description">
+  <title id="title">Detailed AgriPV simulation integration</title>
+  <desc id="description">Detailed repository workflow from STICS input through Archicrop, scene construction, ArchimedLight and PlantBioPhysics to daily or yearly CSV and scene recipe outputs.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; }
+      .title { fill: #172b4d; font-size: 27px; font-weight: 700; text-anchor: middle; }
+      .subtitle { fill: #52627a; font-size: 15px; text-anchor: middle; }
+      .card { fill: #ffffff; stroke: #d6deea; stroke-width: 1.5; }
+      .head { font-size: 17px; font-weight: 700; fill: #172b4d; }
+      .body { font-size: 13.5px; fill: #475569; }
+      .file { font-size: 12px; fill: #334155; font-family: "Courier New", monospace; }
+      .flow { fill: none; stroke: #64748b; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .data { fill: none; stroke: #16834a; stroke-width: 2.7; stroke-dasharray: 8 5; stroke-linecap: round; marker-end: url(#arrow-data); }
+      .flow-label { fill: #334155; font-size: 12px; font-weight: 600; text-anchor: middle; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#64748b" />
     </marker>
-    <marker
-       id="arrow-data"
-       markerWidth="10"
-       markerHeight="8"
-       refX="10"
-       refY="4"
-       orient="auto">
-      <polygon
-         points="0 0, 10 4, 0 8"
-         fill="#28A745"
-         id="polygon2" />
-    </marker>
-    <marker
-       id="arrow-feedback"
-       markerWidth="8"
-       markerHeight="6"
-       refX="8"
-       refY="3"
-       orient="auto">
-      <polygon
-         points="0 0, 8 3, 0 6"
-         fill="#FD7E14"
-         id="polygon3" />
+    <marker id="arrow-data" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#16834a" />
     </marker>
   </defs>
-  <!-- Background -->
-  <rect
-     width="900"
-     height="700"
-     fill="#FFFFFF"
-     id="rect3" />
-  <!-- Title -->
-  <text
-     x="450"
-     y="40"
-     class="title"
-     id="text3">Integrated AgriPV Simulation Framework</text>
-  <text
-     x="450"
-     y="70"
-     class="subtitle"
-     id="text4">Data Flow Between STICS, Archicrop, ArchimedLight, and PlantBioPhysics</text>
-  <!-- STICS Box -->
-  <g
-     transform="translate(50, 120)"
-     id="g9">
-    <rect
-       width="200"
-       height="100"
-       class="box"
-       id="rect4" />
-    <rect
-       width="200"
-       height="25"
-       y="0"
-       class="box-header"
-       id="rect5" />
-    <!-- STICS Logo next to title -->
-    <g
-       transform="translate(11.604827,0.57038814)"
-       id="g5">
-      <circle
-         cx="12"
-         cy="12"
-         r="10"
-         fill="#ffeb3b"
-         stroke="#fbc02d"
-         stroke-width="1"
-         id="circle5" />
-      <path
-         d="m 8,8 8,8 m 0,-8 -8,8"
-         stroke="#f57c00"
-         stroke-width="1.5"
-         id="path5" />
-    </g>
-    <text
-       x="100"
-       y="18"
-       class="box-title"
-       id="text5">STICS Crop Model</text>
-    <text
-       x="10"
-       y="45"
-       class="box-content"
-       id="text6">• Input: Weather, soil, management</text>
-    <text
-       x="10"
-       y="60"
-       class="box-content"
-       id="text7">• Output: simulations_stics_wheat.csv</text>
-    <text
-       x="10"
-       y="75"
-       class="box-content"
-       id="text8">  - lai_n, hauteur, somupvtsem</text>
-    <text
-       x="10"
-       y="90"
-       class="box-content"
-       id="text9">  - laimax, laisen_n, raint</text>
+
+  <rect width="1100" height="800" fill="#f7f9fc" />
+  <text x="550" y="48" class="title">Integrated AgriPV Simulation Workflow</text>
+  <text x="550" y="76" class="subtitle">Repository scripts, exchanged data and generated simulation outputs</text>
+
+  <!-- Connectors are placed behind the component cards. -->
+  <path d="M185 280 V350" class="flow" />
+  <path d="M315 425 H345 C365 425 362 310 390 310" class="flow" />
+  <path d="M690 285 C730 285 745 210 785 210" class="flow" />
+  <path d="M915 280 V350" class="data" />
+  <path d="M785 465 C735 465 728 650 690 650" class="flow" />
+
+  <g transform="translate(55 130)">
+    <rect width="260" height="150" rx="12" class="card" />
+    <path d="M12 0 H248 Q260 0 260 12 V38 H0 V12 Q0 0 12 0" fill="#e6f0ff" />
+    <circle cx="24" cy="19" r="7" fill="#3674c5" />
+    <text x="42" y="25" class="head">STICS crop model</text>
+    <text x="20" y="65" class="body">Inputs: weather, soil, management</text>
+    <text x="20" y="88" class="body">Produces daily growth and phenology</text>
+    <text x="20" y="111" class="body">Growth drives plant development</text>
+    <text x="20" y="134" class="body">Read by Archicrop with .tec / .plt files</text>
   </g>
-  <!-- Archicrop Box -->
-  <g
-     transform="translate(4.528883,286.89782)"
-     id="g15">
-    <rect
-       width="273.98141"
-       height="118.77209"
-       class="box"
-       id="rect9"
-       x="0"
-       y="0" />
-    <rect
-       width="273.98141"
-       height="26.227907"
-       y="0"
-       class="box-header"
-       id="rect10"
-       x="0" />
-    <!-- Archicrop Logo next to title -->
-    <g
-       transform="translate(32.219578,6.7346789)"
-       id="g10">
-      <path
-         d="M 12,2 8,8 4,4 l 4,8 4,-4 4,4 4,-4 4,-4 -4,-4 -4,4 z"
-         fill="#8bc34a"
-         stroke="#66bb6a"
-         stroke-width="0.5"
-         id="path10" />
-    </g>
-    <text
-       x="100"
-       y="18"
-       class="box-title"
-       id="text10">Archicrop</text>
-    <text
-       x="10"
-       y="45"
-       class="box-content"
-       id="text11">• Input: STICS plant files (.tec, .plt)</text>
-    <text
-       x="10"
-       y="60"
-       class="box-content"
-       id="text12">• Domain: domain_per_plant.csv</text>
-    <text
-       x="10"
-       y="75"
-       class="box-content"
-       id="text13">• Output: 2_outputs/archicrop/</text>
-    <text
-       x="10"
-       y="90"
-       class="box-content"
-       id="text14">- wheat_YYYY-MM-DD.obj</text>
-    <text
-       x="10"
-       y="105"
-       class="box-content"
-       id="text15">- wheat_YYYY-MM-DD.mtg</text>
+
+  <g transform="translate(55 350)">
+    <rect width="260" height="150" rx="12" class="card" />
+    <path d="M12 0 H248 Q260 0 260 12 V38 H0 V12 Q0 0 12 0" fill="#e8f5e9" />
+    <circle cx="24" cy="19" r="7" fill="#4f8e45" />
+    <text x="42" y="25" class="head">Archicrop</text>
+    <text x="20" y="65" class="body">Uses STICS output and plant files</text>
+    <text x="20" y="88" class="body">Builds dated 3D plant geometry</text>
+    <text x="20" y="111" class="body">Writes paired OBJ / MTG maquettes</text>
+    <text x="20" y="134" class="file">2_outputs/archicrop/</text>
   </g>
-  <!-- Scene Builder Box -->
-  <g
-     transform="translate(324,214)"
-     id="g20">
-    <rect
-       width="220"
-       height="100"
-       class="box"
-       id="rect15"
-       x="0"
-       y="0" />
-    <rect
-       width="220"
-       height="25"
-       y="0"
-       class="box-header"
-       id="rect16"
-       x="0" />
-    <text
-       x="110"
-       y="18"
-       class="box-title"
-       id="text16">Scene Builder (agripv_scene)</text>
-    <text
-       x="10"
-       y="45"
-       class="box-content"
-       id="text17">• Input: Plant OBJ/MTG files</text>
-    <text
-       x="10"
-       y="60"
-       class="box-content"
-       id="text18">• PV Config: get_pvconfig(id)</text>
-    <text
-       x="10"
-       y="75"
-       class="box-content"
-       id="text19">• Output: PlantGeom scene</text>
-    <text
-       x="10"
-       y="90"
-       class="box-content"
-       id="text20">- With agripv_scene_recipe</text>
+
+  <g transform="translate(390 235)">
+    <rect width="300" height="150" rx="12" class="card" />
+    <path d="M12 0 H288 Q300 0 300 12 V38 H0 V12 Q0 0 12 0" fill="#eeeafd" />
+    <circle cx="24" cy="19" r="7" fill="#7663b5" />
+    <text x="42" y="25" class="head">Scene builder</text>
+    <text x="20" y="65" class="body">Reads dated OBJ / MTG plant maquettes</text>
+    <text x="20" y="88" class="body">Adds PV configuration and planting layout</text>
+    <text x="20" y="111" class="body">Combines plants, panels and ground grid</text>
+    <text x="20" y="134" class="file">agripv_scene()  ->  PlantGeom scene</text>
   </g>
-  <!-- ArchimedLight Box -->
-  <g
-     transform="translate(600, 120)"
-     id="g27">
-    <rect
-       width="220"
-       height="110"
-       class="box"
-       id="rect20" />
-    <rect
-       width="220"
-       height="25"
-       y="0"
-       class="box-header"
-       id="rect21" />
-    <!-- ArchimedLight Logo next to title -->
-    <g
-       transform="translate(28.352096,0.12818631)"
-       id="g22">
-      <circle
-         cx="12"
-         cy="12"
-         r="8"
-         fill="#ffeb3b"
-         stroke="#fbc02d"
-         stroke-width="1"
-         id="circle21" />
-      <path
-         d="M 12,4 V 0 m 0,20 v 4 M 4,12 H 0 m 20,0 h 4"
-         stroke="#fbc02d"
-         stroke-width="1"
-         id="path21" />
-      <path
-         d="M 6,6 4,4 M 18,6 20,4 M 6,18 4,20 m 14,-2 2,2"
-         stroke="#fbc02d"
-         stroke-width="1"
-         id="path22" />
-    </g>
-    <text
-       x="110"
-       y="18"
-       class="box-title"
-       id="text22">ArchimedLight</text>
-    <text
-       x="10"
-       y="45"
-       class="box-content"
-       id="text23">• Input: Scene + LightOptions</text>
-    <text
-       x="10"
-       y="60"
-       class="box-content"
-       id="text24">• Simulation: LightSimulation</text>
-    <text
-       x="10"
-       y="75"
-       class="box-content"
-       id="text25">• Output: Absorbed fluxes</text>
-    <text
-       x="10"
-       y="90"
-       class="box-content"
-       id="text26">  - Ra_PAR_f, Ra_NIR_f</text>
-    <text
-       x="10"
-       y="105"
-       class="box-content"
-       id="text27">  - aPPFD, sky_fraction</text>
+
+  <g transform="translate(785 130)">
+    <rect width="260" height="150" rx="12" class="card" />
+    <path d="M12 0 H248 Q260 0 260 12 V38 H0 V12 Q0 0 12 0" fill="#fff3df" />
+    <circle cx="24" cy="19" r="7" fill="#d88a20" />
+    <text x="42" y="25" class="head">ArchimedLight</text>
+    <text x="20" y="65" class="body">Input: scene and hourly weather</text>
+    <text x="20" y="88" class="body">Runs a LightSimulation</text>
+    <text x="20" y="111" class="body">Absorbed PAR and NIR fluxes</text>
+    <text x="20" y="134" class="body">Supplies aPPFD to plant physiology</text>
   </g>
-  <!-- PlantBioPhysics Box -->
-  <g
-     transform="translate(600, 300)"
-     id="g41">
-    <rect
-       width="220"
-       height="130"
-       class="box"
-       id="rect27" />
-    <rect
-       width="220"
-       height="25"
-       y="0"
-       class="box-header"
-       id="rect28" />
-    <!-- PlantBioPhysics Logo next to title -->
-    <g
-       transform="translate(24.496514,-0.03246295)"
-       id="g35">
-      <circle
-         cx="12"
-         cy="12"
-         r="6"
-         fill="#4fc3f7"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="circle28" />
-      <circle
-         cx="4"
-         cy="4"
-         r="3"
-         fill="#4fc3f7"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="circle29" />
-      <circle
-         cx="20"
-         cy="4"
-         r="3"
-         fill="#4fc3f7"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="circle30" />
-      <circle
-         cx="4"
-         cy="20"
-         r="3"
-         fill="#4fc3f7"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="circle31" />
-      <circle
-         cx="20"
-         cy="20"
-         r="3"
-         fill="#4fc3f7"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="circle32" />
-      <line
-         x1="4"
-         y1="4"
-         x2="20"
-         y2="4"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="line32" />
-      <line
-         x1="4"
-         y1="4"
-         x2="4"
-         y2="20"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="line33" />
-      <line
-         x1="20"
-         y1="4"
-         x2="20"
-         y2="20"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="line34" />
-      <line
-         x1="4"
-         y1="20"
-         x2="20"
-         y2="20"
-         stroke="#29b6f6"
-         stroke-width="1"
-         id="line35" />
-    </g>
-    <text
-       x="110"
-       y="18"
-       class="box-title"
-       id="text35">PlantBioPhysics</text>
-    <text
-       x="10"
-       y="45"
-       class="box-content"
-       id="text36">• Input: aPPFD, environmental</text>
-    <text
-       x="10"
-       y="60"
-       class="box-content"
-       id="text37">• Models: Fvcb, Monteith, Medlyn</text>
-    <text
-       x="10"
-       y="75"
-       class="box-content"
-       id="text38">• Custom: PlantBalance (aggregation)</text>
-    <text
-       x="10"
-       y="90"
-       class="box-content"
-       id="text39">• Output: Plant-level fluxes</text>
-    <text
-       x="10"
-       y="105"
-       class="box-content"
-       id="text40">  - A_plant, assimilation_step</text>
-    <text
-       x="10"
-       y="120"
-       class="box-content"
-       id="text41">  - transpiration, Tₗ_mean</text>
+
+  <g transform="translate(785 350)">
+    <rect width="260" height="150" rx="12" class="card" />
+    <path d="M12 0 H248 Q260 0 260 12 V38 H0 V12 Q0 0 12 0" fill="#e4f5f7" />
+    <circle cx="24" cy="19" r="7" fill="#3193a1" />
+    <text x="42" y="25" class="head">PlantBioPhysics</text>
+    <text x="20" y="65" class="body">Uses light and weather variables</text>
+    <text x="20" y="88" class="body">Leaf energy balance and physiology</text>
+    <text x="20" y="111" class="body">FvCB, Monteith and Medlyn models</text>
+    <text x="20" y="134" class="body">PlantBalance plant-level aggregation</text>
   </g>
-  <!-- Outputs Box -->
-  <g
-     transform="translate(320, 420)"
-     id="g48">
-    <rect
-       width="220"
-       height="120"
-       class="box"
-       id="rect41" />
-    <rect
-       width="220"
-       height="25"
-       y="0"
-       class="box-header"
-       id="rect42" />
-    <text
-       x="110"
-       y="18"
-       class="box-title"
-       id="text42">Simulation Outputs</text>
-    <text
-       x="10"
-       y="45"
-       class="box-content"
-       id="text43">• Leaf: out_config_ID.csv</text>
-    <text
-       x="10"
-       y="60"
-       class="box-content"
-       id="text44">  - A, Tₗ, Gₛ, λE, section fluxes</text>
-    <text
-       x="10"
-       y="75"
-       class="box-content"
-       id="text45">• Light: light_config_ID.csv.gz</text>
-    <text
-       x="10"
-       y="90"
-       class="box-content"
-       id="text46">  - Ra_PAR_f, aPPFD, sky fraction</text>
-    <text
-       x="10"
-       y="105"
-       class="box-content"
-       id="text47">• Plants: plants_config_ID.csv</text>
-    <text
-       x="10"
-       y="120"
-       class="box-content"
-       id="text48">  - A_plant, transpiration, cumulative</text>
+
+  <g transform="translate(390 585)">
+    <rect width="300" height="150" rx="12" class="card" />
+    <path d="M12 0 H288 Q300 0 300 12 V38 H0 V12 Q0 0 12 0" fill="#edf1f6" />
+    <circle cx="24" cy="19" r="7" fill="#64748b" />
+    <text x="42" y="25" class="head">Simulation outputs</text>
+    <text x="20" y="65" class="file">out_config_ID.csv</text>
+    <text x="160" y="65" class="body">leaf sections</text>
+    <text x="20" y="88" class="file">light_config_ID.csv.gz</text>
+    <text x="204" y="88" class="body">light</text>
+    <text x="20" y="111" class="file">plants_config_ID.csv</text>
+    <text x="184" y="111" class="body">plants</text>
+    <text x="20" y="134" class="file">scene_config_*.toml</text>
+    <text x="184" y="134" class="body">recipe</text>
   </g>
-  <!-- Connections -->
-  <!-- STICS to Archicrop -->
-  <path
-     d="m 150,220 v 64.14644"
-     class="connection"
-     id="path48"
-     sodipodi:nodetypes="cc" />
-  <!-- Archicrop to Scene Builder -->
-  <path
-     d="M 229.37467,287.281 C 240.65128,258.84828 265.1847,227.85752 324,226.5"
-     class="connection"
-     id="path49"
-     sodipodi:nodetypes="cc" />
-  <!-- Scene Builder to ArchimedLight -->
-  <path
-     d="m 465.32194,212.81243 c 17.12755,-35.52653 71.18277,-51.51557 133.48321,-52.74804"
-     class="connection"
-     id="path50"
-     sodipodi:nodetypes="cc"
-     style="stroke-linecap:butt" />
-  <!-- ArchimedLight to PlantBioPhysics -->
-  <path
-     d="m 710,230 v 70"
-     class="connection"
-     id="path51"
-     sodipodi:nodetypes="cc" />
-  <!-- PlantBioPhysics to Outputs -->
-  <path
-     d="m 710,430 c -19.92555,48.80932 -81.02632,56.88063 -169.48834,58.28837"
-     class="connection"
-     id="path52"
-     sodipodi:nodetypes="cc" />
-  <!-- Data flows (main coupling) -->
-  <!-- STICS growth -> PlantBioPhysics (indirect) -->
-  <path
-     d="m 250,132.5 c 126.83413,-43.730228 215.08528,-43.764357 350,0"
-     class="data-flow"
-     id="path53"
-     sodipodi:nodetypes="cc" />
-  <text
-     x="324.33725"
-     y="229.12947"
-     class="label"
-     transform="rotate(-20)"
-     id="text53">Growth forcing</text>
-  <!-- ArchimedLight -> PlantBioPhysics (main) -->
-  <path
-     d="m 679.04616,229.14735 q 0,30 0,70"
-     class="data-flow"
-     id="path54" />
-  <text
-     x="237.6682"
-     y="-667.44659"
-     class="label"
-     transform="rotate(90)"
-     id="text54">aPPFD</text>
-  <!-- Feedback loops -->
-  <!-- PlantBioPhysics -> STICS (water/nitrogen stress) -->
-  <path
-     d="M 710 365 Q 500 420 300 420"
-     class="feedback"
-     id="path55" />
-  <path
-     d="M 300 420 Q 200 420 150 365"
-     class="feedback"
-     id="path56" />
-  <text
-     x="380"
-     y="400"
-     class="label"
-     transform="rotate(15 380,400)"
-     id="text56">Water/Nitrogen</text>
-  <!-- Scene Builder feedback (shading) -->
-  <path
-     d="m 476.43003,317.69801 q 0,30 0,50"
-     class="feedback"
-     id="path57" />
-  <text
-     x="328.78232"
-     y="-390.97495"
-     class="label"
-     transform="rotate(90)"
-     id="text57">Shading</text>
+
+  <g>
+    <rect x="201" y="302" width="90" height="22" rx="11" fill="#f7f9fc" />
+    <text x="246" y="317" class="flow-label">Growth data</text>
+    <rect x="318" y="390" width="78" height="22" rx="11" fill="#f7f9fc" />
+    <text x="357" y="405" class="flow-label">OBJ / MTG</text>
+    <rect x="695" y="236" width="78" height="22" rx="11" fill="#f7f9fc" />
+    <text x="734" y="251" class="flow-label">3D scene</text>
+    <rect x="924" y="302" width="66" height="22" rx="11" fill="#f7f9fc" />
+    <text x="957" y="317" class="flow-label" fill="#16834a">aPPFD</text>
+    <rect x="708" y="540" width="120" height="22" rx="11" fill="#f7f9fc" />
+    <text x="768" y="555" class="flow-label">Daily / yearly results</text>
+  </g>
 </svg>

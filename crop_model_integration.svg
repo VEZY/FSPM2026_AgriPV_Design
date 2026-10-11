@@ -1,191 +1,106 @@
-<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
-  <!-- Definitions -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="760" viewBox="0 0 1100 760" role="img" aria-labelledby="title description">
+  <title id="title">Crop model integration workflow</title>
+  <desc id="description">STICS growth drives Archicrop plant maquettes. A scene builder combines maquettes with the agrivoltaic layout, ArchimedLight calculates absorbed light, and PlantBioPhysics simulates leaf and plant processes before exporting results.</desc>
   <defs>
-    <style type="text/css"><![CDATA[
-      .module {
-        fill: #E3F2FD;
-        stroke: #2196F3;
-        stroke-width: 2;
-        rx: 12;
-        ry: 12;
-      }
-      .module-dark {
-        fill: #1565C0;
-        stroke: #42A5F5;
-        stroke-width: 2;
-        rx: 12;
-        ry: 12;
-      }
-      .module-light-text {
-        fill: #FFFFFF;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        text-anchor: middle;
-      }
-      .module-dark-text {
-        fill: #FFFFFF;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        text-anchor: middle;
-      }
-      .connection {
-        fill: none;
-        stroke: #666666;
-        stroke-width: 2;
-        marker-end: url(#arrowhead);
-      }
-      .connection-dark {
-        fill: none;
-        stroke: #90CAF9;
-        stroke-width: 2;
-        marker-end: url(#arrowhead-dark);
-      }
-      .data-flow {
-        fill: none;
-        stroke: #4CAF50;
-        stroke-width: 2.5;
-        stroke-dasharray: 8, 4;
-        marker-end: url(#arrowhead-green);
-      }
-      .data-flow-dark {
-        fill: none;
-        stroke: #81C784;
-        stroke-width: 2.5;
-        stroke-dasharray: 8, 4;
-        marker-end: url(#arrowhead-green-dark);
-      }
-      .label {
-        fill: #333333;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 12px;
-        text-anchor: middle;
-      }
-      .label-dark {
-        fill: #FFFFFF;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 12px;
-        text-anchor: middle;
-      }
-      .title {
-        fill: #212121;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 24px;
-        font-weight: bold;
-        text-anchor: middle;
-      }
-      .title-dark {
-        fill: #FFFFFF;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 24px;
-        font-weight: bold;
-        text-anchor: middle;
-      }
-      .subtitle {
-        fill: #666666;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 16px;
-        text-anchor: middle;
-      }
-      .subtitle-dark {
-        fill: #BDBDBD;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 16px;
-        text-anchor: middle;
-      }
-    ]]></style>
-
-    <!-- Arrowheads -->
-    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#666666" />
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; }
+      .title { fill: #172b4d; font-size: 27px; font-weight: 700; text-anchor: middle; }
+      .subtitle { fill: #52627a; font-size: 15px; text-anchor: middle; }
+      .card { fill: #ffffff; stroke: #d6deea; stroke-width: 1.5; }
+      .head { font-size: 17px; font-weight: 700; fill: #172b4d; }
+      .body { font-size: 14px; fill: #475569; }
+      .flow { fill: none; stroke: #64748b; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .data { fill: none; stroke: #16834a; stroke-width: 2.7; stroke-dasharray: 8 5; stroke-linecap: round; marker-end: url(#arrow-data); }
+      .flow-label { fill: #334155; font-size: 12px; font-weight: 600; text-anchor: middle; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#64748b" />
     </marker>
-    <marker id="arrowhead-dark" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#90CAF9" />
-    </marker>
-    <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#4CAF50" />
-    </marker>
-    <marker id="arrowhead-green-dark" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#81C784" />
+    <marker id="arrow-data" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#16834a" />
     </marker>
   </defs>
 
-  <!-- Background -->
-  <rect width="800" height="600" fill="#FFFFFF" />
+  <rect width="1100" height="760" fill="#f7f9fc" />
+  <text x="550" y="48" class="title">Crop Model Integration Framework</text>
+  <text x="550" y="76" class="subtitle">From STICS crop growth to spatial AgriPV simulation and outputs</text>
 
-  <!-- Title -->
-  <text x="400" y="50" class="title">Crop Model Integration Framework</text>
-  <text x="400" y="80" class="subtitle">Connecting STICS, Archicrop, ArchimedLight, and PlantBioPhysics</text>
+  <!-- Connectors are placed behind the component cards. -->
+  <path d="M185 270 V350" class="flow" />
+  <path d="M315 420 H345 C365 420 362 310 390 310" class="flow" />
+  <path d="M690 285 C730 285 745 210 785 210" class="flow" />
+  <path d="M915 280 V350" class="data" />
+  <path d="M785 465 C735 465 728 635 690 635" class="flow" />
 
-  <!-- STICS Module -->
-  <g transform="translate(100, 120)">
-    <rect width="180" height="100" class="module" />
-    <text x="90" y="40" class="module-light-text">STICS Crop Model</text>
-    <text x="90" y="65" class="label">Generates growth dynamics</text>
-    <text x="90" y="85" class="label">LAI, height, biomass, phenology</text>
+  <g transform="translate(55 130)">
+    <rect width="260" height="140" rx="12" class="card" />
+    <path d="M12 0 H248 Q260 0 260 12 V38 H0 V12 Q0 0 12 0" fill="#e6f0ff" />
+    <circle cx="24" cy="19" r="7" fill="#3674c5" />
+    <text x="42" y="25" class="head">STICS</text>
+    <text x="20" y="68" class="body">Crop growth and phenology</text>
+    <text x="20" y="92" class="body">Weather, soil and management</text>
+    <text x="20" y="116" class="body">Daily growth variables</text>
   </g>
 
-  <!-- Archicrop Module -->
-  <g transform="translate(100, 280)">
-    <rect width="180" height="100" class="module" />
-    <text x="90" y="40" class="module-light-text">Archicrop</text>
-    <text x="90" y="65" class="label">3D plant geometry generation</text>
-    <text x="90" y="85" class="label">OBJ/MTG files from STICS inputs</text>
+  <g transform="translate(55 350)">
+    <rect width="260" height="150" rx="12" class="card" />
+    <path d="M12 0 H248 Q260 0 260 12 V38 H0 V12 Q0 0 12 0" fill="#e8f5e9" />
+    <circle cx="24" cy="19" r="7" fill="#4f8e45" />
+    <text x="42" y="25" class="head">Archicrop</text>
+    <text x="20" y="69" class="body">Uses STICS crop development</text>
+    <text x="20" y="94" class="body">Builds date-specific 3D plants</text>
+    <text x="20" y="119" class="body">Exports OBJ and MTG maquettes</text>
   </g>
 
-  <!-- ArchimedLight Module -->
-  <g transform="translate(420, 120)">
-    <rect width="180" height="100" class="module" />
-    <text x="90" y="40" class="module-light-text">ArchimedLight</text>
-    <text x="90" y="65" class="label">Light interception &amp; absorption</text>
-    <text x="90" y="85" class="label">PAR/NIR fluxes, scattering</text>
+  <g transform="translate(390 235)">
+    <rect width="300" height="150" rx="12" class="card" />
+    <path d="M12 0 H288 Q300 0 300 12 V38 H0 V12 Q0 0 12 0" fill="#eeeafd" />
+    <circle cx="24" cy="19" r="7" fill="#7663b5" />
+    <text x="42" y="25" class="head">Scene Builder</text>
+    <text x="20" y="69" class="body">Combines plant geometry and PV layout</text>
+    <text x="20" y="94" class="body">Adds ground and planting arrangement</text>
+    <text x="20" y="119" class="body">Builds the 3D simulation scene</text>
   </g>
 
-  <!-- PlantBioPhysics Module -->
-  <g transform="translate(420, 280)">
-    <rect width="180" height="100" class="module" />
-    <text x="90" y="40" class="module-light-text">PlantBioPhysics</text>
-    <text x="90" y="65" class="label">Physiological processes</text>
-    <text x="90" y="85" class="label">Photosynthesis, transpiration</text>
+  <g transform="translate(785 130)">
+    <rect width="260" height="150" rx="12" class="card" />
+    <path d="M12 0 H248 Q260 0 260 12 V38 H0 V12 Q0 0 12 0" fill="#fff3df" />
+    <circle cx="24" cy="19" r="7" fill="#d88a20" />
+    <text x="42" y="25" class="head">ArchimedLight</text>
+    <text x="20" y="69" class="body">Simulates light in the 3D scene</text>
+    <text x="20" y="94" class="body">Calculates absorbed PAR and NIR</text>
+    <text x="20" y="119" class="body">Provides aPPFD to physiology</text>
   </g>
 
-  <!-- Scene Builder -->
-  <g transform="translate(260, 200)">
-    <rect width="180" height="80" class="module" />
-    <text x="90" y="30" class="module-light-text">Scene Builder</text>
-    <text x="90" y="50" class="label">agripv_scene()</text>
-    <text x="90" y="65" class="label">Combines geometry + PV layout</text>
+  <g transform="translate(785 350)">
+    <rect width="260" height="150" rx="12" class="card" />
+    <path d="M12 0 H248 Q260 0 260 12 V38 H0 V12 Q0 0 12 0" fill="#e4f5f7" />
+    <circle cx="24" cy="19" r="7" fill="#3193a1" />
+    <text x="42" y="25" class="head">PlantBioPhysics</text>
+    <text x="20" y="69" class="body">Models leaf physiology and energy</text>
+    <text x="20" y="94" class="body">Uses light and weather forcing</text>
+    <text x="20" y="119" class="body">Aggregates plant-level results</text>
   </g>
 
-  <!-- Connections -->
-  <!-- STICS to Archicrop -->
-  <path d="M 190 170 Q 210 190 210 220" class="connection" />
-  <text x="220" y="200" class="label" transform="rotate(-45 220,200)">Growth parameters</text>
+  <g transform="translate(390 585)">
+    <rect width="300" height="100" rx="12" class="card" />
+    <path d="M12 0 H288 Q300 0 300 12 V38 H0 V12 Q0 0 12 0" fill="#edf1f6" />
+    <circle cx="24" cy="19" r="7" fill="#64748b" />
+    <text x="42" y="25" class="head">Simulation outputs</text>
+    <text x="20" y="67" class="body">Leaf, light and plant CSV tables</text>
+    <text x="20" y="88" class="body">Scene recipe for reconstruction</text>
+  </g>
 
-  <!-- Archicrop to Scene Builder -->
-  <path d="M 190 330 Q 210 310 240 290" class="connection" />
-  <text x="250" y="300" class="label" transform="rotate(-30 250,300)">Plant geometries</text>
-
-  <!-- Scene Builder to ArchimedLight -->
-  <path d="M 420 170 Q 390 190 360 220" class="connection" />
-  <text x="350" y="200" class="label" transform="rotate(45 350,200)">3D scene</text>
-
-  <!-- ArchimedLight to PlantBioPhysics -->
-  <path d="M 510 220 Q 480 200 450 170" class="connection" />
-  <text x="440" y="180" class="label" transform="rotate(45 440,180)">Absorbed PAR</text>
-
-  <!-- Data flows (bidirectional) -->
-  <!-- STICS to PlantBioPhysics (indirect via growth) -->
-  <path d="M 190 170 Q 250 100 380 80" class="data-flow" />
-  <text x="280" y="90" class="label" transform="rotate(-20 280,90)">Growth forcing</text>
-
-  <!-- PlantBioPhysics to STICS (feedback) -->
-  <path d="M 420 330 Q 360 380 240 380" class="data-flow" />
-  <path d="M 240 380 Q 200 380 190 330" class="data-flow" />
-  <text x="290" y="360" class="label" transform="rotate(15 290,360)">Water/Nitrogen stress</text>
-
-  <!-- ArchimedLight to Scene Builder (feedback) -->
-  <path d="M 420 200 Q 390 220 360 240" class="data-flow" />
-  <text x="370" y="230" class="label" transform="rotate(-20 370,230)">Shading effects</text>
+  <g>
+    <rect x="201" y="302" width="90" height="22" rx="11" fill="#f7f9fc" />
+    <text x="246" y="317" class="flow-label">Growth data</text>
+    <rect x="318" y="390" width="78" height="22" rx="11" fill="#f7f9fc" />
+    <text x="357" y="405" class="flow-label">OBJ / MTG</text>
+    <rect x="695" y="236" width="78" height="22" rx="11" fill="#f7f9fc" />
+    <text x="734" y="251" class="flow-label">3D scene</text>
+    <rect x="924" y="302" width="66" height="22" rx="11" fill="#f7f9fc" />
+    <text x="957" y="317" class="flow-label" fill="#16834a">aPPFD</text>
+    <rect x="708" y="535" width="120" height="22" rx="11" fill="#f7f9fc" />
+    <text x="768" y="550" class="flow-label">Simulation results</text>
+  </g>
 </svg>

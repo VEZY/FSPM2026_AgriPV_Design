@@ -1,37 +1,28 @@
 # SVG Diagrams for AgriPV Simulation Framework
 
-This directory contains two SVG diagrams that illustrate the integration of the STICS crop model, Archicrop, ArchimedLight, and PlantBioPhysics in the AgriPV simulation framework.
+This directory contains two SVG diagrams illustrating the repository's STICS, Archicrop, scene-building, ArchimedLight, and PlantBioPhysics workflow.
 
 ## Files
 
-1. `crop_model_integration.svg` - High-level overview showing the main connections between the four components.
-2. `detailed_integration.svg` - Detailed diagram with:
-   - Component boxes with logos (STICS, Archicrop, ArchimedLight, PlantBioPhysics)
-   - Solid connection arrows showing data/input flow
-   - Dashed green arrows for main data coupling (growth forcing, aPPFD)
-   - Dashed orange arrows for feedback loops (water/nitrogen stress, shading effects)
-   - Icons representing each component's domain
-   - Outputs box showing generated CSV files
+1. `crop_model_integration.svg` - High-level view of the crop-to-simulation workflow and its outputs.
+2. `detailed_integration.svg` - Repository-level view of component inputs, exchanged data, and output files.
+
+Solid arrows show the main processing sequence. The dashed green arrow shows the absorbed-light (`aPPFD`) input passed from ArchimedLight to PlantBioPhysics. There are no feedback-loop arrows: the daily and yearly simulation drivers run the coupled light and physiology models downstream of the STICS-driven plant growth.
 
 ## Creation Process
 
-The diagrams were created and refined through an iterative process:
-- Initial SVG created with basic shapes and connections
-- Fixed XML parsing errors (escaped special characters like "&" to "&amp;")
-- Moved logos from external positions to inside component boxes next to titles
-- Adjusted logo positions (left/up by 10px) for better alignment
-- Preserved all semantic connections and labels
+The diagrams use self-contained SVG markup, embedded styles, and arrow markers; no external images, fonts, or scripts are required.
 
 ## Usage
 
-These diagrams can be used in documentation, presentations, or reports to visualize the AgriPV simulation workflow showing how:
-1. STICS generates crop growth dynamics
-2. Archicrop creates 3D plant geometries from STICS outputs
-3. Scene Builder combines plant geometries with PV panel layout
-4. ArchimedLight simulates light interception and absorption
-5. PlantBioPhysics models physiological processes (photosynthesis, transpiration)
-6. Outputs collect leaf-level, light-level, and plant-level simulation results
+The workflow shown is:
+1. STICS provides crop growth and phenology used by Archicrop.
+2. Archicrop generates date-specific plant maquettes as OBJ and MTG files.
+3. `agripv_scene()` combines the maquettes with the PV configuration, planting layout, and ground.
+4. ArchimedLight calculates light absorption and provides `aPPFD` to PlantBioPhysics.
+5. PlantBioPhysics models leaf physiology and energy balance, then aggregates plant summaries.
+6. The simulation writes leaf, light, and plant CSV tables plus a scene recipe.
 
 ## Last Updated
 
-October 10, 2026 - Based on code review of the 1_code/ simulation scripts.
+October 11, 2026 - Aligned with the workflow in `1_code/`.
