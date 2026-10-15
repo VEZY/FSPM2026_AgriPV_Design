@@ -1,11 +1,13 @@
 # SVG Diagrams for AgriPV Simulation Framework
 
-This directory contains two SVG diagrams illustrating the repository's STICS, Archicrop, scene-building, ArchimedLight, and PlantBioPhysics workflow.
+This directory contains SVG diagrams illustrating the repository's STICS, Archicrop, scene-building, ArchimedLight, and PlantBioPhysics workflow, plus the Ground Coverage Ratio (GCR) and Land Equivalent Ratio (LER) definitions.
 
 ## Files
 
 1. `crop_model_integration.svg` - High-level view of the crop-to-simulation workflow and its outputs.
 2. `detailed_integration.svg` - Repository-level view of component inputs, exchanged data, and output files.
+3. `gcr_flat_panels.svg` - Side and plan views defining GCR for horizontal photovoltaic panels.
+4. `ler_flat_panels.svg` - Crop and electricity yield references used to define LER for an agrivoltaic system with horizontal panels.
 
 Solid arrows show the main processing sequence. Dashed green arrows show the `aPPFD` input passed from ArchimedLight to PlantBiophysics and the forced-growth relationship, with no feedback from light simulations. Dotted blue arrows show meteorological forcing to STICS, ArchimedLight, and PlantBiophysics.
 

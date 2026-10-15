@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title description">
+  <title id="title">Ground Coverage Ratio for flat agrivoltaic panels</title>
+  <desc id="description">A side view shows horizontal photovoltaic panels above crops, with dashed vertical lines marking their projection on the ground. A plan view shows panel footprints within the full crop-land boundary. Ground Coverage Ratio is the total vertical projected panel area divided by crop-land area.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; }
+      .title { fill: #172b4d; font-size: 30px; font-weight: 700; text-anchor: middle; }
+      .subtitle { fill: #52627a; font-size: 16px; text-anchor: middle; }
+      .card { fill: #ffffff; stroke: #d6deea; stroke-width: 1.5; }
+      .section { fill: #172b4d; font-size: 18px; font-weight: 700; }
+      .label { fill: #334155; font-size: 14px; font-weight: 600; }
+      .small { fill: #52627a; font-size: 12px; }
+      .crop { fill: none; stroke: #568344; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .ground { stroke: #8b7355; stroke-width: 3; }
+      .projection { fill: #dbeafe; }
+      .project-line { fill: none; stroke: #2875b7; stroke-width: 2; stroke-dasharray: 6 5; }
+      .panel { fill: #244c75; stroke: #163653; stroke-width: 1.5; }
+      .panel-grid { fill: none; stroke: #91b1ca; stroke-width: 1; }
+      .land { fill: #f4f8ef; stroke: #76926b; stroke-width: 2; }
+      .formula { fill: #172b4d; font-size: 25px; font-weight: 700; text-anchor: middle; }
+      .formula-label { fill: #52627a; font-size: 13px; text-anchor: middle; }
+      .note { fill: #334155; font-size: 14px; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#64748b" />
+    </marker>
+  </defs>
+
+  <rect width="1200" height="760" fill="#f7f9fc" />
+  <text x="600" y="48" class="title">Ground Coverage Ratio (GCR)</text>
+  <text x="600" y="76" class="subtitle">Vertical projection of flat photovoltaic panels onto the crop land</text>
+
+  <g>
+    <rect x="40" y="108" width="550" height="410" rx="12" class="card" />
+    <text x="66" y="145" class="section">Side view · horizontal panels</text>
+    <text x="66" y="169" class="small">Panel surface is parallel to the ground (0° inclination)</text>
+
+    <rect x="150" y="396" width="318" height="22" class="projection" />
+    <path d="M150 232 V418 M468 232 V418" class="project-line" />
+
+    <path d="M205 253 V395 M410 253 V395" stroke="#596b7d" stroke-width="7" />
+    <rect x="150" y="224" width="318" height="29" rx="2" class="panel" />
+    <path d="M229.5 224 V253 M309 224 V253 M388.5 224 V253" class="panel-grid" />
+
+    <line x1="150" y1="214" x2="468" y2="214" stroke="#64748b" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+    <text x="309" y="204" class="label" text-anchor="middle">Panel surface</text>
+    <line x1="118" y1="253" x2="118" y2="393" stroke="#64748b" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+    <text x="105" y="326" class="small" text-anchor="middle" transform="rotate(-90 105 326)">Elevated above crops</text>
+
+    <line x1="68" y1="418" x2="560" y2="418" class="ground" />
+    <path d="M95 418 v-37 m0 13 -10 -10 m10 17 11 -13 M130 418 v-48 m0 16 -11 -10 m11 19 12 -14 M488 418 v-43 m0 14 -10 -10 m10 18 12 -15 M525 418 v-35 m0 12 -9 -9 m9 16 10 -12" class="crop" />
+    <text x="309" y="447" class="label" text-anchor="middle">Vertical projection on ground</text>
+    <line x1="150" y1="463" x2="468" y2="463" stroke="#2875b7" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+    <text x="309" y="488" class="small" text-anchor="middle">Projected area (same area as panel when flat)</text>
+  </g>
+
+  <g>
+    <rect x="610" y="108" width="550" height="410" rx="12" class="card" />
+    <text x="636" y="145" class="section">Plan view · areas used in GCR</text>
+    <text x="636" y="169" class="small">Panel footprints sit within the total crop-land boundary</text>
+
+    <rect x="662" y="192" width="446" height="270" rx="4" class="land" />
+    <text x="885" y="214" class="label" text-anchor="middle">Total crop-land area</text>
+
+    <g class="panel">
+      <rect x="748" y="235" width="276" height="35" rx="2" />
+      <rect x="748" y="296" width="276" height="35" rx="2" />
+      <rect x="748" y="357" width="276" height="35" rx="2" />
+      <rect x="748" y="418" width="276" height="25" rx="2" />
+    </g>
+    <g class="panel-grid">
+      <path d="M817 235 V270 M886 235 V270 M955 235 V270 M817 296 V331 M886 296 V331 M955 296 V331 M817 357 V392 M886 357 V392 M955 357 V392 M817 418 V443 M886 418 V443 M955 418 V443" />
+    </g>
+
+    <path d="M698 252 h29 M698 313 h29 M698 374 h29 M698 430 h29" stroke="#568344" stroke-width="2" />
+    <path d="M705 252 v-13 m0 5 -5 -5 m5 8 5 -6 M705 313 v-13 m0 5 -5 -5 m5 8 5 -6 M705 374 v-13 m0 5 -5 -5 m5 8 5 -6 M705 430 v-13 m0 5 -5 -5 m5 8 5 -6" class="crop" />
+
+    <rect x="738" y="477" width="22" height="12" rx="2" class="panel" />
+    <text x="770" y="488" class="small">PV panel vertical projection</text>
+    <rect x="943" y="477" width="22" height="12" rx="2" class="land" />
+    <text x="975" y="488" class="small">Crop land</text>
+  </g>
+
+  <g>
+    <rect x="40" y="542" width="1120" height="174" rx="12" fill="#ffffff" stroke="#d6deea" stroke-width="1.5" />
+    <text x="600" y="578" class="section" text-anchor="middle">Ground Coverage Ratio</text>
+    <text x="600" y="620" class="formula">GCR = Total vertical projected PV panel area / Total crop-land area</text>
+    <line x1="156" y1="641" x2="1044" y2="641" stroke="#e2e8f0" stroke-width="1.5" />
+    <text x="600" y="672" class="note" text-anchor="middle">For flat panels, the vertical projection equals the panel surface area; count all panels in the numerator.</text>
+  </g>
+</svg>
