@@ -1,7 +1,7 @@
 using FileIO, GeometryBasics, CoordinateTransformations, MultiScaleTreeGraph, PlantGeom
 using ArchimedLight
 using Dates, Glob, Agrivoltaics
-using SHA
+using SHA, Random
 
 _agripv_file_sha256(path) = bytes2hex(open(SHA.sha256, path))
 
@@ -103,7 +103,7 @@ function agripv_scene(;
     ground_ny=ground_res,
     obj_path=nothing,
     mtg_path=nothing,
-    plant_rotations=nothing,
+    plant_rotations=nothing, rng=Random.default_rng(),
 )
     # ground_res is the number of cells per axis, independent of domain size.
     # Explicit dimensions preserve the grids of previously saved scenes.
@@ -131,7 +131,7 @@ function agripv_scene(;
     # Save actual radians, rather than a random seed, so reconstruction replays
     # the placements independently of the global RNG and its implementation.
     rotations = isnothing(plant_rotations) ?
-                [deg2rad(randn() * 50.0) for _ in 1:nplants] : Float64.(plant_rotations)
+                [deg2rad(randn(rng) * 50.0) for _ in 1:nplants] : Float64.(plant_rotations)
     length(rotations) == nplants && all(isfinite, rotations) || throw(ArgumentError(
         "plant_rotations must contain $nplants finite angles in radians.",
     ))

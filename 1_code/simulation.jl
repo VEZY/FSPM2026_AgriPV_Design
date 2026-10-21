@@ -9,16 +9,8 @@ end
 using .AgripvPlantBalance
 include("simulation_outputs.jl")
 
-"""Build the scene and coupled models without running or materializing outputs."""
-function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), meteo=nothing,
-    light_cache_memory_limit_bytes=2 * 1024^3)
-    meteo = isnothing(meteo) ? get_meteo(day) : meteo
-    isempty(meteo) && throw(ArgumentError("No meteorology for $day"))
-    all(row -> Date(row.date) == day, meteo) || throw(ArgumentError(
-        "Daily meteorology must contain only $day.",
-    ))
-    scene = agripv_scene(; c=pvconfig, day, scene_kwargs...)
-    options = LightOptions(
+function _agripv_light_options(pvconfig)
+    return LightOptions(
         turtle_sectors=46,
         pixel_size=0.01,
         toricity=true,
@@ -28,6 +20,18 @@ function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), mete
         include_sky_fraction=true,
         scene_rotation_deg=pvconfig.panel_orientation,
     )
+end
+
+"""Build the scene and coupled models without running or materializing outputs."""
+function prepare_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), meteo=nothing,
+    light_cache_memory_limit_bytes=2 * 1024^3)
+    meteo = isnothing(meteo) ? get_meteo(day) : meteo
+    isempty(meteo) && throw(ArgumentError("No meteorology for $day"))
+    all(row -> Date(row.date) == day, meteo) || throw(ArgumentError(
+        "Daily meteorology must contain only $day.",
+    ))
+    scene = agripv_scene(; c=pvconfig, day, scene_kwargs...)
+    options = _agripv_light_options(pvconfig)
     meteo = archimed_meteo(meteo, options)
     # Dense scenes exceed ArchimedLight's default 512 MiB response budget.
     # Keep directional responses resident instead of rerasterizing every hour.
@@ -180,4 +184,31 @@ function read_aPAR_from_component_values(; csv_path)
     values_df = combine(groupby(df, [:step_number, :object_id]), :Ra_PAR_q => sum => :Ra_PAR_q_sum)
 
     return values_df
+end
+
+
+"""Run radiation only, retaining geometry-wide light; no physiology or plant totals."""
+function light_day_simulation(; pvconfig, day, scene_kwargs=NamedTuple(), meteo=nothing,
+    light_cache_memory_limit_bytes=2 * 1024^3)
+    meteo = isnothing(meteo) ? get_meteo(day) : meteo
+    isempty(meteo) && throw(ArgumentError("No meteorology for $day."))
+    all(row -> Date(row.date) == day, meteo) || throw(ArgumentError("Forcing spans other dates."))
+    scene = agripv_scene(; c=pvconfig, day, scene_kwargs...)
+    options = _agripv_light_options(pvconfig)
+    meteo = archimed_meteo(meteo, options)
+    light_sim = LightSimulation(scene, agripv_models(); options, memory_limit_bytes=light_cache_memory_limit_bytes)
+    targets = Many(kind=(:active_leaf, :senescent_leaf, :radiative_geometry), within=SceneScope())
+    application = ModelSpec(ArchimedLightModel(light_sim; output_schema=:coupling,
+        par_energy_to_photon=PlantMeteo.Constants().J_to_umol);
+        name=:archimed_light, on=One(scale=:Scene), outputs_to=(OutputTo(targets; coverage=:exact),))
+    function geometry_kind(node)
+        isnothing(node[:geometry]) && return nothing
+        MultiScaleTreeGraph.symbol(node) == :LeafSection || return :radiative_geometry
+        return node[:state] == "senescent" ? :senescent_leaf : :active_leaf
+    end
+    coupled = CompositeModel(scene.mtg; status=node -> Status(), kind=geometry_kind,
+        applications=(application,), environment=meteo)
+    simulation = PlantSimEngine.run!(coupled; steps=length(meteo), outputs=light_output_requests())
+    light = collect_light_outputs(simulation, coupled; dates=[row.date for row in meteo])
+    return (; leaves=DataFrame(), plants=DataFrame(), light, simulation, scene, meteo)
 end
