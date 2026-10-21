@@ -18,7 +18,7 @@ end
 
 """
     regenerate_saved_plots(; groups=(:configurations, :daily, :fapar, :assimilation,
-        :integrated, :period_summary), assimilation_day=Date(2025, 5, 15))
+        :integrated, :period_summary, :temperature), assimilation_day=Date(2025, 5, 15))
 
 Regenerate the numbered figures from retained outputs, through Kaimon with
 `mt=true`. Configuration views include translucent periodic copies and use the
@@ -30,15 +30,17 @@ three cumulative quantities, each with and without panels, and the historical
 configuration-0 assimilation view. The period-summary group exports one table
 per configuration and a comparison table, with actual planting counts and
 explicit units and aggregation formulas. Source simulation outputs are unchanged.
+The temperature group selects the common maximum-green-LAI day and plots all
+configurations' retained leaf temperatures at peak incident PAR.
 Select a subset of groups to rerun specific figures. Return the groups that
 finished successfully; missing outputs and inconsistent identities raise errors.
 """
 function regenerate_saved_plots(; groups=(:configurations, :daily, :fapar, :assimilation,
-    :integrated, :period_summary), assimilation_day=Date(2025, 5, 15))
+    :integrated, :period_summary, :temperature), assimilation_day=Date(2025, 5, 15))
     groups = groups isa Symbol ? (groups,) : Tuple(groups)
     length(unique(groups)) == length(groups) || throw(ArgumentError("Repeated plotting groups."))
-    all(group -> group in (:configurations, :daily, :fapar, :assimilation, :integrated, :period_summary), groups) ||
-        throw(ArgumentError("Select :configurations, :daily, :fapar, :assimilation, :integrated or :period_summary."))
+    all(group -> group in (:configurations, :daily, :fapar, :assimilation, :integrated, :period_summary, :temperature), groups) ||
+        throw(ArgumentError("Select :configurations, :daily, :fapar, :assimilation, :integrated, :period_summary or :temperature."))
     completed = Symbol[]
     for group in groups
         scripts = if group == :configurations
@@ -53,6 +55,8 @@ function regenerate_saved_plots(; groups=(:configurations, :daily, :fapar, :assi
             ("5.7_plot_year_cumulative_assimilation.jl",)
         elseif group == :period_summary
             ("5.10_summarize_period.jl",)
+        elseif group == :temperature
+            ("5.11_plot_leaf_temperature.jl",)
         else
             ("5.8_integrate_year_radiations.jl", "5.8_plot_cumulative_appfd_3d.jl")
         end

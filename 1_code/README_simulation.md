@@ -1,5 +1,33 @@
 # Daily light and physiology simulation
 
+## Compact STICS growth-forcing inset
+
+To regenerate the small LAI/height figure for the workflow diagram, execute
+through a Kaimon session for this project:
+
+```julia
+include("1_code/1.1_plot_stics_forcing.jl")
+result = regenerate_stics_forcing_inset()
+```
+
+This reads the existing `mod_sneodur_2025.sti` consumed by
+`2_archicrop_simulations.py`; it does not run STICS or ArchiCrop. The displayed
+daily dates match the saved wheat OBJ meshes (currently 4 March–2 July 2025).
+The two targets are STICS `laimax` (m² leaf per m² ground) and `hauteur` (m).
+ArchiCrop converts them to leaf area per plant and height in cm internally.
+The `LAImax` label identifies the growth target: green LAI `lai(n)` is a
+different output, and leaf senescence is forced separately with `laisen(n)`.
+
+`2_outputs/stics_forcing_inset.svg` and `.pdf` are vector exports suitable for
+resizing in a diagram. The transparent `.png` is exported at four times the
+240 × 150 logical size. `_preview.png` shows the same inset at native size on
+a white background. Coloured direct labels, thick curves, sparse y ticks
+and one shared date axis keep the inset legible at small sizes. Its `.csv`
+retains the plotted daily targets, and `.toml` records source columns, units
+and period. `show_values=false` removes the numeric y-axis decorations if
+an even smaller schematic is needed. To show the full active STICS crop period
+without requiring saved meshes, pass `archicrop_dir=nothing`.
+
 ## Regenerate figures from saved outputs
 
 Start or connect a Kaimon session for this project, then execute with `mt=true`
@@ -85,6 +113,32 @@ Execute it through Kaimon with `mt=true`:
 include("1_code/tests/plotting_runtests.jl")
 ```
 
+## Leaf temperature on the maximum green-LAI day
+
+Execute `include("1_code/5.11_plot_leaf_temperature.jl")` through Kaimon with
+`mt=true`, or select `regenerate_saved_plots(; groups=(:temperature,))`.
+`leaf_temperature_plotting.jl` selects the earliest day attaining each
+configuration's maximum actual green LAI: retained exchanging leaf area divided
+by the saved ground area. It then selects the common timestep with maximum
+incident `Ri_PAR_f`, and colors the matching saved leaf-section geometries by
+their original `Tₗ` (°C). It does not rerun radiation or physiology.
+
+The combined `leaf_temperature_3d_YYYYMMDD_HHMM.png` uses one shared temperature
+color range/bar, common physical scaling, the geographic southwest camera and
+a North arrow. Mesh shading is disabled so the colors represent temperature
+independently of surface orientation. Individual configuration PNGs use that same range. The daily
+LAI CSV, temperature summary CSV and TOML retain selection rules, units and
+forcing provenance. If the forcing was reconstructed rather than archived,
+the figure and TOML state this; temperatures always come from retained outputs.
+Timestamps are used as stored, with no timezone conversion.
+
+For another day or translucent periodic context:
+
+```julia
+include("1_code/leaf_temperature_plotting.jl")
+plot_leaf_temperature_3d(; day=Date(2025, 5, 15), repeats=(2, 2))
+```
+
 ## Plot the configuration designs
 
 Through Kaimon with `mt=true`, generate all four configuration views:
@@ -97,19 +151,23 @@ This rebuilds geometry from the saved yearly recipes, verifies source hashes and
 geometry fingerprints, and defaults to the last date shared by all four
 configurations. It does not run simulations. Each configuration exports
 `2_outputs/config_ID.png` for the simulated cell and
-`2_outputs/config_ID_repeated.png` for a 2×2 layout: the opaque simulated cell
-and three translucent copies (`repeat_alpha=0.18`). Repeated foliage is also
+`2_outputs/config_ID_repeated.png` for the periodic design: the opaque simulated
+cell and translucent copies (`repeat_alpha=0.18`). The default minimum local-x
+context is 5 m (`repeat_x_width=5.0`), giving 5×2 cells for configurations 0/1
+and 2×2 for configurations 2/3. Repeated foliage is also
 desaturated and uses lower opacity so overlapping leaves do not obscure the
 simulated canopy.
 `2_outputs/configurations_repeated.png` combines the four repeated designs.
 `2_outputs/configurations_top.png` and `config_ID_top.png` add orthographic
 views from above (89.9° elevation), with geographic North up, South down and
-East right. These views show the original simulated cell without repetitions.
+East right. These views include the same translucent periodic context.
 Only the simulated cell has a bounding box. Copy spacing comes from the exact
 `scene.scene_xy_bounds` periods; axes remain in local scene coordinates, while
-titles give the saved scene rotation. The three-quarter plotting paths use the
-same geographic southwest viewpoint and mark geographic south with an arrow
-pointing toward the lower right. Translucent copies remain behind the simulated cell,
+titles give the saved scene rotation. All panels use the same physical scale:
+orthographic cameras, equal square horizontal framing and a common height span
+avoid independently magnifying the smaller domains. The three-quarter plotting
+paths use the same geographic southwest viewpoint. Both views mark geographic
+north with an arrow and a separated `N` label. Translucent copies remain behind the simulated cell,
 on the upper side of the image, with offsets derived from the camera direction.
 ArchimedLight rotates sky directions into the unchanged local mesh coordinates:
 for a saved rotation θ, local north is `(sin(θ), cos(θ), 0)`, south is its
@@ -122,7 +180,9 @@ For another saved date or repetition setting, use the reusable functions:
 
 ```julia
 include("1_code/configuration_plotting.jl")
-plot_configurations(; day=Date(2025, 5, 15), repeats=(2, 2), repeat_alpha=0.18)
+plot_configurations(; day=Date(2025, 5, 15), repeats=(2, 2), repeat_x_width=5.0, repeat_alpha=0.18)
+plot_configuration_topviews(; day=Date(2025, 5, 15), repeat_x_width=5.0)
+# To use exactly the explicit repetition counts, set repeat_x_width=0.
 # Or use the full figure entrypoint for just these views:
 include("1_code/5_regenerate_plots.jl")
 regenerate_saved_plots(; groups=(:configurations,))

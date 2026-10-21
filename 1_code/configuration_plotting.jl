@@ -31,8 +31,8 @@ function _configuration_node_color(node)
     return RGBf(0.5, 0.5, 0.5)
 end
 
-function _configuration_geometry(; config_id, day, output_dir)
-    saved = load_yearly_scene(; config_id, day, output_dir)
+function _configuration_geometry(; config_id, day, output_dir, saved=nothing, color_by_node=nothing)
+    saved = isnothing(saved) ? load_yearly_scene(; config_id, day, output_dir) : saved
     scene = saved.scene
     domain = scene.scene_xy_bounds
     isnothing(domain) && throw(ArgumentError("The saved scene has no periodic domain."))
@@ -43,7 +43,8 @@ function _configuration_geometry(; config_id, day, output_dir)
     node_colors = Dict{Int,RGBf}()
     ghost_node_colors = Dict{Int,RGBAf}()
     traverse!(scene.mtg) do node
-        color = _configuration_node_color(node)
+        color = isnothing(color_by_node) ? _configuration_node_color(node) :
+            get(color_by_node, node_id(node), _configuration_node_color(node))
         node_colors[node_id(node)] = color
         # Many wheat surfaces overlap in projection. Fade and desaturate these
         # more strongly so the repeated canopy stays visibly subordinate.
@@ -89,11 +90,23 @@ function _configuration_offsets(prepared; repeats=(2, 2), geographic_azimuth_deg
     azimuth = agripv_local_camera_azimuth(prepared.rotation; geographic_azimuth_deg)
     # Put copies behind the opaque cell for the selected geographic view.
     # Changing the camera by 180° reverses these offsets, keeping copies above.
-    xdirection = cos(azimuth) >= 0 ? -1 : 1
-    ydirection = sin(azimuth) >= 0 ? -1 : 1
+    # At cardinal bearings, tiny floating-point signs must not choose which
+    # side receives the copies. The tie puts them on the same side each time.
+    xdirection = cos(azimuth) >= -1e-12 ? -1 : 1
+    ydirection = sin(azimuth) >= -1e-12 ? -1 : 1
     xmin, ymin, xmax, ymax = prepared.domain
     return [(xdirection * i * (xmax - xmin), ydirection * j * (ymax - ymin))
         for j in 0:(ny - 1) for i in 0:(nx - 1)]
+end
+
+function _configuration_repeats(prepared; repeats=(2, 2), repeat_x_width=5.0)
+    nx, ny = repeats
+    nx isa Integer && ny isa Integer && nx > 0 && ny > 0 ||
+        throw(ArgumentError("repeats must contain two positive integer tile counts."))
+    isfinite(repeat_x_width) && repeat_x_width >= 0 ||
+        throw(ArgumentError("repeat_x_width must be finite and nonnegative."))
+    xmin, _, xmax, _ = prepared.domain
+    return (max(nx, ceil(Int, repeat_x_width / (xmax - xmin))), ny)
 end
 
 function _configuration_box!(ax, prepared; fontsize=20, view=:threequarter)
@@ -108,10 +121,10 @@ function _configuration_box!(ax, prepared; fontsize=20, view=:threequarter)
     camera = _configuration_camera(view)
     azimuth = agripv_local_camera_azimuth(prepared.rotation;
         geographic_azimuth_deg=camera.geographic_azimuth_deg)
-    xfront = cos(azimuth) >= 0 ? xmax : xmin
-    yfront = sin(azimuth) >= 0 ? ymax : ymin
-    xsign = cos(azimuth) >= 0 ? 1 : -1
-    ysign = sin(azimuth) >= 0 ? 1 : -1
+    xfront = cos(azimuth) >= -1e-12 ? xmax : xmin
+    yfront = sin(azimuth) >= -1e-12 ? ymax : ymin
+    xsign = cos(azimuth) >= -1e-12 ? 1 : -1
+    ysign = sin(azimuth) >= -1e-12 ? 1 : -1
     dx, dy = xmax - xmin, ymax - ymin
     horizontal_span = max(dx, dy)
     label_scale = max(horizontal_span, zmax - zmin)
@@ -121,10 +134,15 @@ function _configuration_box!(ax, prepared; fontsize=20, view=:threequarter)
     caption_z = zmin - 0.06 * label_scale
     xcaption = Point3f((xmin + xmax) / 2, yfront + ysign * label_gap, caption_z)
     ycaption = Point3f(xfront + xsign * label_gap, (ymin + ymax) / 2, caption_z)
+    # Text grows outward from its anchor, away from the opaque canopy.
+    # Centering long captions lets the mesh hide the end of the label.
+    outward_align(component) = abs(component) < 1e-12 ? :center : component > 0 ? :left : :right
+    xalign = outward_align(ysign * cos(azimuth))
+    yalign = outward_align(-xsign * sin(azimuth))
     text!(ax, xcaption;
-        text="local x (m)", fontsize, align=(:center, :center))
+        text="local x (m)", fontsize, align=(xalign, :top))
     text!(ax, ycaption;
-        text="local y (m)", fontsize, align=(:center, :center))
+        text="local y (m)", fontsize, align=(yalign, :top))
     # The vertical ruler collapses in a view from above, obscuring the cell.
     if view == :top
         label_points = Point3f[xcaption, ycaption]
@@ -152,13 +170,13 @@ function _configuration_box!(ax, prepared; fontsize=20, view=:threequarter)
 end
 
 function _configuration_axis!(position, prepared; repeats=(2, 2), repeat_alpha=0.18,
-    fontsize=20, view=:threequarter)
+    fontsize=20, view=:threequarter, shading=GLMakie.Makie.automatic)
     0 < repeat_alpha < 1 || throw(ArgumentError("repeat_alpha must lie strictly between zero and one."))
     camera = _configuration_camera(view)
     offsets = _configuration_offsets(prepared; repeats,
         geographic_azimuth_deg=camera.geographic_azimuth_deg)
     xmin, ymin, xmax, ymax = prepared.domain
-    ax = Axis3(position; aspect=:data, perspectiveness=0,
+    ax = Axis3(position; aspect=:data, perspectiveness=0, viewmode=:fitzoom,
         azimuth=agripv_local_camera_azimuth(prepared.rotation;
             geographic_azimuth_deg=camera.geographic_azimuth_deg), elevation=camera.elevation,
         title="Config $(prepared.config_id) · scene rotation $(prepared.rotation |> Int)°\n$(xmax - xmin) × $(ymax - ymin) m simulated cell",
@@ -169,12 +187,16 @@ function _configuration_axis!(position, prepared; repeats=(2, 2), repeat_alpha=0
     for (dx, dy) in offsets
         original = dx == 0 && dy == 0
         p = mesh!(ax, prepared.mesh; color=original ? prepared.colors : prepared.ghost_colors,
-            alpha=original ? 1.0 : repeat_alpha, transparency=!original)
+            alpha=original ? 1.0 : repeat_alpha, transparency=!original, shading)
         translate!(p, dx, dy, 0)
     end
     box = _configuration_box!(ax, prepared; fontsize, view)
+    horizontal_span = max(xmax - xmin, ymax - ymin)
+    annotation_span = max(horizontal_span, prepared.bounds[3][2] - prepared.bounds[3][1])
     compass = agripv_cardinal_arrow!(ax, prepared.domain, prepared.rotation; fontsize,
-        geographic_azimuth_deg=camera.geographic_azimuth_deg)
+        cardinal=:north, geographic_azimuth_deg=camera.geographic_azimuth_deg,
+        domain_gap_fraction=0.70 * annotation_span / horizontal_span, label_gap_fraction=0.60,
+        label_align=view == :top ? (:center, :bottom) : (:right, :bottom))
     xoffsets, yoffsets = first.(offsets), last.(offsets)
     xbounds, ybounds, zbounds = prepared.bounds
     xlims = (min(xbounds[1] + minimum(xoffsets), compass.bounds[1][1], box.bounds[1][1]),
@@ -190,26 +212,49 @@ function _configuration_axis!(position, prepared; repeats=(2, 2), repeat_alpha=0
     return ax
 end
 
+"""Use one metre-to-screen scale, without changing the saved local geometry."""
+function _configuration_match_scales!(axes; spans=nothing)
+    bounds = [ax.finallimits[] for ax in axes]
+    if isnothing(spans)
+        horizontal = maximum(max(rect.widths[1], rect.widths[2]) for rect in bounds)
+        vertical = maximum(rect.widths[3] for rect in bounds)
+        spans = (horizontal, horizontal, vertical)
+    end
+    # A square horizontal frame is invariant to the configurations' 90°/180°
+    # bearings. With :data aspect, :fitzoom and equal panel sizes, the physical
+    # scale is identical instead of zooming each design to fill its panel.
+    for (ax, rect) in zip(axes, bounds)
+        center = rect.origin + rect.widths / 2
+        limits!(ax, (center[1] - spans[1] / 2, center[1] + spans[1] / 2),
+            (center[2] - spans[2] / 2, center[2] + spans[2] / 2),
+            (center[3] - spans[3] / 2, center[3] + spans[3] / 2))
+    end
+    return spans
+end
+
 function _configuration_footer(figure, row, day; repeated, columns=1, view=:threequarter)
     meaning = repeated ? "Opaque: simulated cell   ·   Faded: periodic repetitions" : "Outlined: simulated cell"
-    direction = view == :top ? "North ↑ · South ↓" : "S: geographic south"
-    Label(figure[row, 1:columns], "$meaning   ·   $direction   ·   Geometry: $day";
+    direction = view == :top ? "North ↑ · South ↓" : "N: geographic north"
+    Label(figure[row, 1:columns], "$meaning\nSame scale in all panels   ·   $direction   ·   Geometry: $day";
         fontsize=19, color=RGBf(0.35, 0.35, 0.35), padding=(0, 0, 8, 8), tellwidth=false)
 end
 
 """
-    plot_configurations(; config_ids=0:3, day=nothing, repeats=(2,2), repeat_alpha=0.18, ...)
+    plot_configurations(; config_ids=0:3, day=nothing, repeats=(2,2), repeat_x_width=5.0, ...)
 
 Export each saved configuration as a single cell and with translucent periodic
 copies, plus one combined repeated-design figure. The opaque cell and its box
 are the simulated domain; copies share the original mesh and use exact saved
 domain periods. Local geometry is unchanged; the camera has one common
-geographic southwest viewing direction and the south arrow uses the simulation
-rotation. Copies stay above the foreground cell in the image.
+geographic southwest viewing direction and the north arrow uses the simulation
+rotation. Copies stay above the foreground cell in the image. At least 5 m of
+local-x context is shown by default: five cells for configs 0/1 and two for 2/3.
+All configurations share one physical scale. Set `repeat_x_width=0` to use only
+the explicit `repeats` counts.
 Default to the last saved scene date common to all requested configurations.
 Run through Kaimon with `mt=true`; no simulation is executed.
 """
-function plot_configurations(; config_ids=0:3, day=nothing, repeats=(2, 2), repeat_alpha=0.18,
+function plot_configurations(; config_ids=0:3, day=nothing, repeats=(2, 2), repeat_x_width=5.0, repeat_alpha=0.18,
     input_dir=_agripv_yearly_output_dir(), output_dir=joinpath(_agripv_project_root(), "2_outputs"))
     config_ids = collect(config_ids)
     !isempty(config_ids) && length(unique(config_ids)) == length(config_ids) ||
@@ -223,32 +268,40 @@ function plot_configurations(; config_ids=0:3, day=nothing, repeats=(2, 2), repe
         @info "Rendering saved configuration geometry" config_id day
         prepared = _configuration_geometry(; config_id, day, output_dir=input_dir)
         push!(geometries, prepared)
-        for repeated in (false, true)
-            figure = Figure(size=(1100, 1000), fontsize=22, backgroundcolor=:white)
-            _configuration_axis!(figure[1, 1], prepared;
-                repeats=repeated ? repeats : (1, 1), repeat_alpha, fontsize=22)
-            _configuration_footer(figure, 2, day; repeated)
-            suffix = repeated ? "_repeated" : ""
-            path = joinpath(output_dir, "config_$(config_id)$(suffix).png")
-            save(path, figure; px_per_unit=2)
-            push!(paths, path)
-            GLMakie.closeall()
-            GC.gc()
-        end
     end
     figure = Figure(size=(1600, 1500), fontsize=22, backgroundcolor=:white)
     columns = min(2, length(geometries))
     Label(figure[0, 1:columns], "Periodic AgriPV configurations"; fontsize=30, font=:bold, tellwidth=false)
+    axes = Axis3[]
+    tile_counts = [_configuration_repeats(prepared; repeats, repeat_x_width) for prepared in geometries]
     for (i, prepared) in enumerate(geometries)
         row, col = divrem(i - 1, columns)
-        _configuration_axis!(figure[row + 1, col + 1], prepared; repeats, repeat_alpha, fontsize=21)
+        push!(axes, _configuration_axis!(figure[row + 1, col + 1], prepared;
+            repeats=tile_counts[i], repeat_alpha, fontsize=21))
     end
+    spans = _configuration_match_scales!(axes)
     _configuration_footer(figure, cld(length(geometries), columns) + 1, day; repeated=true, columns)
     path = joinpath(output_dir, "configurations_repeated.png")
     save(path, figure; px_per_unit=2)
     push!(paths, path)
     GLMakie.closeall()
-    return (; day, repeats, repeat_alpha, paths)
+    empty!(axes)
+    figure = nothing
+    GC.gc()
+    for (prepared, tiles) in zip(geometries, tile_counts), repeated in (false, true)
+        figure = Figure(size=(1100, 1000), fontsize=22, backgroundcolor=:white)
+        ax = _configuration_axis!(figure[1, 1], prepared;
+            repeats=repeated ? tiles : (1, 1), repeat_alpha, fontsize=22)
+        _configuration_match_scales!([ax]; spans)
+        _configuration_footer(figure, 2, day; repeated)
+        suffix = repeated ? "_repeated" : ""
+        path = joinpath(output_dir, "config_$(prepared.config_id)$(suffix).png")
+        save(path, figure; px_per_unit=2)
+        push!(paths, path)
+        GLMakie.closeall()
+        GC.gc()
+    end
+    return (; day, repeats, repeat_x_width, tile_counts, repeat_alpha, spans, paths)
 end
 
 """
@@ -258,13 +311,14 @@ Export each saved experimental configuration viewed from above, plus one
 combined figure. All views use geographic North up, South down and East right,
 applying the saved simulation rotation to the camera and compass. The camera
 is orthographic at 89.9° elevation, avoiding a singular camera basis at exact
-zenith while keeping height parallax negligible. Only the simulated cell is
-drawn; the original three-quarter and
-periodic-repetition figures are preserved by `plot_configurations`.
+zenith while keeping height parallax negligible. The simulated cell is opaque
+and outlined; translucent periodic copies show the repeated design. All panels
+share one physical scale. The repeat settings match `plot_configurations`.
 Default to the latest saved scene date common to all requested configurations.
 Run through Kaimon with `mt=true`; no simulation is executed.
 """
 function plot_configuration_topviews(; config_ids=0:3, day=nothing,
+    repeats=(2, 2), repeat_x_width=5.0, repeat_alpha=0.18,
     input_dir=_agripv_yearly_output_dir(), output_dir=joinpath(_agripv_project_root(), "2_outputs"))
     config_ids = collect(config_ids)
     !isempty(config_ids) && length(unique(config_ids)) == length(config_ids) ||
@@ -277,29 +331,40 @@ function plot_configuration_topviews(; config_ids=0:3, day=nothing,
         @info "Rendering saved configuration from above" config_id day
         prepared = _configuration_geometry(; config_id, day, output_dir=input_dir)
         push!(geometries, prepared)
-        figure = Figure(size=(1100, 1000), fontsize=22, backgroundcolor=:white)
-        _configuration_axis!(figure[1, 1], prepared; repeats=(1, 1), fontsize=22, view=:top)
-        _configuration_footer(figure, 2, day; repeated=false, view=:top)
-        path = joinpath(output_dir, "config_$(config_id)_top.png")
-        save(path, figure; px_per_unit=2)
-        push!(paths, path)
-        GLMakie.closeall()
         GC.gc()
     end
     figure = Figure(size=(1600, 1500), fontsize=22, backgroundcolor=:white)
     columns = min(2, length(geometries))
     Label(figure[0, 1:columns], "AgriPV configurations · view from above";
         fontsize=30, font=:bold, tellwidth=false)
+    axes = Axis3[]
+    tile_counts = [_configuration_repeats(prepared; repeats, repeat_x_width) for prepared in geometries]
     for (i, prepared) in enumerate(geometries)
         row, col = divrem(i - 1, columns)
-        _configuration_axis!(figure[row + 1, col + 1], prepared;
-            repeats=(1, 1), fontsize=21, view=:top)
+        push!(axes, _configuration_axis!(figure[row + 1, col + 1], prepared;
+            repeats=tile_counts[i], repeat_alpha, fontsize=21, view=:top))
     end
+    spans = _configuration_match_scales!(axes)
     _configuration_footer(figure, cld(length(geometries), columns) + 1, day;
-        repeated=false, columns, view=:top)
+        repeated=true, columns, view=:top)
     path = joinpath(output_dir, "configurations_top.png")
     save(path, figure; px_per_unit=2)
     push!(paths, path)
     GLMakie.closeall()
-    return (; day, view=:top, paths)
+    empty!(axes)
+    figure = nothing
+    GC.gc()
+    for (prepared, tiles) in zip(geometries, tile_counts)
+        figure = Figure(size=(1100, 1000), fontsize=22, backgroundcolor=:white)
+        ax = _configuration_axis!(figure[1, 1], prepared; repeats=tiles,
+            repeat_alpha, fontsize=22, view=:top)
+        _configuration_match_scales!([ax]; spans)
+        _configuration_footer(figure, 2, day; repeated=true, view=:top)
+        path = joinpath(output_dir, "config_$(prepared.config_id)_top.png")
+        save(path, figure; px_per_unit=2)
+        push!(paths, path)
+        GLMakie.closeall()
+        GC.gc()
+    end
+    return (; day, view=:top, repeats, repeat_x_width, tile_counts, repeat_alpha, spans, paths)
 end

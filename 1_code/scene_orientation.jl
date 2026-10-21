@@ -59,18 +59,21 @@ function _agripv_orientation_domain(scene_or_mtg)
 end
 
 function _agripv_cardinal_arrow_layout(domain, scene_rotation_deg;
-    cardinal=:south, geographic_azimuth_deg=225.0, z=0.02)
+    cardinal=:south, geographic_azimuth_deg=225.0, z=0.02,
+    domain_gap_fraction=0.20, label_gap_fraction=0.22)
     cardinal in (:north, :south) || throw(ArgumentError("Select geographic :north or :south."))
     xmin, ymin, xmax, ymax = domain
     all(isfinite, domain) && xmin < xmax && ymin < ymax ||
         throw(ArgumentError("The compass arrow requires a finite positive domain."))
     isfinite(z) || throw(ArgumentError("The compass arrow height must be finite."))
+    all(x -> isfinite(x) && x > 0, (domain_gap_fraction, label_gap_fraction)) ||
+        throw(ArgumentError("Compass spacing fractions must be finite and positive."))
     azimuth = agripv_local_camera_azimuth(scene_rotation_deg; geographic_azimuth_deg)
     heading = getproperty(agripv_local_cardinal_directions(scene_rotation_deg), cardinal)
-    xsign = cos(azimuth) >= 0 ? 1 : -1
-    ysign = sin(azimuth) >= 0 ? 1 : -1
+    xsign = cos(azimuth) >= -1e-12 ? 1 : -1
+    ysign = sin(azimuth) >= -1e-12 ? 1 : -1
     span = max(xmax - xmin, ymax - ymin)
-    gap = 0.20 * span
+    gap = domain_gap_fraction * span
     arrow_length = min(0.65, 0.24 * span)
     base = Point3f((xsign > 0 ? xmax : xmin) + xsign * gap,
         (ysign > 0 ? ymax : ymin) + ysign * gap, z)
@@ -82,7 +85,7 @@ function _agripv_cardinal_arrow_layout(domain, scene_rotation_deg;
     right = head_base - 0.12 * arrow_length * side
     # GLMakie needs one concrete coordinate type; scalar arithmetic above can
     # promote the tip/head to Float64 while the base remains Float32.
-    label = Point3f(tip + 0.22 * arrow_length * direction)
+    label = Point3f(tip + label_gap_fraction * arrow_length * direction)
     points = Point3f[base, tip, left, tip, right, tip]
     bounds = ntuple(i -> extrema(point[i] for point in [points; [label]]), 3)
     return (; points, label, bounds, direction=heading, cardinal)
@@ -93,12 +96,14 @@ _agripv_north_arrow_layout(domain, rotation; kwargs...) =
 
 """Draw geographic south (or north) outside a domain, using the saved simulation rotation."""
 function agripv_cardinal_arrow!(axis, domain::NTuple{4,<:Real}, rotation::Real;
-    cardinal=:south, fontsize=20, geographic_azimuth_deg=225.0)
+    cardinal=:south, fontsize=20, geographic_azimuth_deg=225.0,
+    domain_gap_fraction=0.20, label_gap_fraction=0.22,
+    label_align=(:center, :center))
     layout = _agripv_cardinal_arrow_layout(domain, rotation;
-        cardinal, geographic_azimuth_deg)
+        cardinal, geographic_azimuth_deg, domain_gap_fraction, label_gap_fraction)
     linesegments!(axis, layout.points; color=:black, linewidth=2.5)
     text!(axis, layout.label; text=cardinal == :south ? "S" : "N",
-        fontsize, font=:bold, align=(:center, :center))
+        fontsize, font=:bold, align=label_align)
     return layout
 end
 
