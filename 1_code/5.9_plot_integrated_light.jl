@@ -1,48 +1,38 @@
-using CSV, DataFrames
-using Dates
-using ArchimedLight
-using PlantGeom, GLMakie
-
-# Include necessary modules
+# Historical filename: colors show growth-cycle net assimilation, in mol CO₂/plant.
+using Dates, DataFrames, ArchimedLight, PlantGeom, GLMakie
 isdefined(@__MODULE__, :attach_assimilation_to_yearly_scene) || include("attach_assimilation_to_scene.jl")
+isdefined(@__MODULE__, :agripv_cardinal_arrow!) || include("scene_orientation.jl")
 
-
-# df_integrated = CSV.read("2_outputs/simulations/yearly/last_day_ids.csv", DataFrame)
-# sort!(df_integrated, [:plant_id])
-
-# df_temp = filter(:datetime => x -> DateTime(x) == DateTime("2025-07-02T00:00:00"), df_integrated)
-
-# filter(:plant_instance_id => ==(5), df_temp)
-
-# df_nb_of_nodes_per_plant = combine(groupby(df_temp, :plant_instance_id), nrow => :nb_of_nodes)
-# length(unique(df_temp.plant_instance_id))
-# == nrow(df_nb_of_nodes_per_plant) || throw(ArgumentError("Mismatch in number of unique plant IDs and rows in the grouped DataFrame."))
-
-# bar =
-#     data(df_nb_of_nodes_per_plant) *
-#     mapping(
-#         :plant_id => "Plant ID",
-#         :nb_of_nodes => "Number of Nodes"
-#     ) *
-#     visual(Bars, color=:plant_id, colormap=:viridis)
-
-# draw(bar; figure=(size=(900, 700), title="Number of nodes per plant ID"))
-
-
-
-# Load scene
-scene = attach_assimilation_to_yearly_scene(0, Date("2025-07-02"))
-
-# Visualize with color based on total_assimilation
-begin
-    fig = Figure()
-    ax = LScene(fig[1, 1])
-
-    # This will automatically use the :total_assimilation attribute for coloring
-    plantviz!(ax, scene; color=:total_assimilation, colormap=:viridis)
-
-    # Add colorbar
-    Colorbar(fig[1, 2], label="Total Assimilation (mol CO₂)")
-
-    fig
+"""Plot and save growth-cycle net assimilation on a verified saved daily scene."""
+function plot_integrated_assimilation(; config_id=0, day=nothing,
+    input_dir=_agripv_yearly_output_dir(),
+    output_dir=joinpath(_agripv_project_root(), "2_outputs", "cumulative_assimilation"))
+    metadata = TOML.parsefile(joinpath(input_dir, "scene_config_$(config_id).toml"))
+    isnothing(day) && (day = maximum(Date.(metadata["days"])))
+    scene = attach_assimilation_to_yearly_scene(config_id, day; output_dir=input_dir)
+    values = integrated_plant_assimilation(; config_id, output_dir=input_dir).total_assimilation
+    lo, hi = extrema(values)
+    lo == hi && (hi = lo + 1)
+    color_range = (lo, hi)
+    fig = Figure(size=(1200, 850))
+    Label(fig[0, 1:2], "Growth-cycle net assimilation · Config $(config_id)", fontsize=24)
+    rotation = agripv_scene_rotation_deg(scene)
+    ax = Axis3(fig[1, 1]; aspect=:data, perspectiveness=0,
+        azimuth=agripv_local_camera_azimuth(rotation), elevation=deg2rad(30),
+        xlabel="local x (m)", ylabel="local y (m)", zlabel="z (m)",
+        title="Scene rotation $(rotation |> Int)° · S: geographic south",
+        viewmode=:fit, protrusions=50)
+    plantviz!(ax, scene.mtg; color=:total_assimilation, color_mode=:node,
+        colormap=:viridis, colorrange=color_range, color_missing=Makie.to_color(:gray85))
+    agripv_cardinal_arrow!(ax, scene)
+    autolimits!(ax)
+    Colorbar(fig[1, 2]; limits=color_range, colormap=:viridis,
+        label="Growth-cycle net assimilation (mol CO₂/plant)")
+    Label(fig[2, 1:2], "$(first(metadata["days"])) → $(last(metadata["days"])) · geometry: $(day)", fontsize=18)
+    mkpath(output_dir)
+    path = joinpath(output_dir, "integrated_assimilation_3d_config_$(config_id).png")
+    save(path, fig; px_per_unit=1.5)
+    return (; figure=fig, scene, path, color_range)
 end
+
+integrated_assimilation = plot_integrated_assimilation()

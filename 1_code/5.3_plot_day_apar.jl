@@ -1,90 +1,10 @@
-using Colors # For color definitions
-using Agrivoltaics # For the solar panel structure and mesh generation
-using GeometryBasics # For geometry
-using MultiScaleTreeGraph # For the MTG data structure
-using PlantGeom # For the growth and visualization API
-using GLMakie
-using ArchimedLight
-using PlantMeteo, Dates, TableOperations, PlantMeteo.Tables
-using AlgebraOfGraphics, DataFrames, Statistics, CSV
-using PlantBiophysics, PlantSimEngine
-# using Plot
+isdefined(@__MODULE__, :saved_day_absorbed_par) || include("daily_plotting.jl")
 
-include("simulation.jl")
-
-configIDs = range(0,3)
 day = Date(2025, 7, 2)
-
-# TODO
-values_dfs = []
-for configID in configIDs
-    push!(values_dfs, read_aPAR_from_component_values(csv_path="2_outputs/simulations/daily/results_config$(configID)_$(day).csv"))
-end
-
-# Make the plot of aPAR average with all configurations
-
-f = Figure(size=(900, 700), title="Absorbed PAR for each config over a day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)")
-# ax1 = Axis(f[1, 1], title="Average assimilation over the day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)", xticks=0:2:24)
-axs = []
-
-for configID in configIDs
-    row = 1 + (configID) ÷ 2
-    col = 1 + (configID) % 2
-    push!(axs, Axis(f[row, col], title="Config $configID", xticks=0:2:24))
-    for plant_id in range(minimum(values_dfs[configID+1].object_id), maximum(values_dfs[configID+1].object_id))
-        ndf = filter(:object_id => ==(plant_id), values_dfs[configID+1])
-        apar =
-            data(ndf) *
-            mapping(
-                :step_number => (x -> (x-1)) => "Hour",
-                :Ra_PAR_q_sum => "Absorbed PAR energy"
-            ) *
-            visual(Lines, alpha=0.05, color=:black)
-        draw!(axs[end], apar)
-        # plot!(ax1, ndf.step_number, ndf.Ra_PAR_q_sum)
-    end
-    ndf_avg = combine(groupby(values_dfs[1], :step_number), :Ra_PAR_q_sum => mean => :Ra_PAR_q_sum_avg)
-    apar_avg =
-        data(ndf_avg) *
-        mapping(
-            :step_number => (x -> (x-1)) => "Hour",
-            :Ra_PAR_q_sum_avg => "Absorbed PAR energy"
-        ) *
-        visual(Lines, alpha=0.7, color=:red, linewidth=3)
-    draw!(axs[end], apar_avg)
-end
-# for configID in configIDs
-#     # plt = data(plant_df[configID]) *
-#     #     mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
-#     #     visual(Lines, alpha=0.05)
-#     plant_df_avg[configID] = combine(groupby(plant_df[configID], :date), :assimilation => mean => :assimilation_mean)
-#     plt_avg = data(plant_df_avg[configID]) *
-#         mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
-#         visual(Lines, color=:red, linewidth=3)
-
-#     draw!(ax, plt_avg, label="Config $configID")
-# end
-
+# Preserve the original per-step energy quantity using retained forcing durations.
+df = saved_day_absorbed_par(; day, config_ids=0:3, quantity=:energy)
+f = plot_daily_plant_panels(df; day, variable=:absorbed_PAR_J,
+    ylabel="Absorbed PAR per step (J plant⁻¹)", title="Absorbed PAR energy per plant")
+save(joinpath(_agripv_project_root(), "2_outputs", "day_aPAR_configs.png"),
+    f; px_per_unit=3.0)
 f
-
-save("2_outputs/day_aPAR_configs.png", f, update=false, px_per_unit=3.0)
-
-
-CSV.write("2_outputs/daily_apar_crop_horizontal_design.csv", plant_df_0)
-CSV.write("2_outputs/daily_apar_crop_tilted_design.csv", plant_df)
-
-plant_df_0 = CSV.read("2_outputs/daily_apar_crop_horizontal_design.csv", DataFrame)
-plant_df = CSV.read("2_outputs/daily_apar_crop_tilted_design.csv", DataFrame)
-
-apar_sum_plant_0 = combine(groupby(plant_df_0, :plant_id), :apar => sum => :apar_sum)
-apar_sum_plant_ref = combine(groupby(plant_df, :plant_id), :apar => sum => :apar_sum)
-minimum(apar_sum_plant_0.apar_sum), maximum(apar_sum_plant_0.apar_sum), mean(apar_sum_plant_0.apar_sum)
-minimum(apar_sum_plant_ref.apar_sum), maximum(apar_sum_plant_ref.apar_sum), mean(apar_sum_plant_ref.apar_sum)
-
-minimum(apar_sum_plant_0.apar_sum) / maximum(apar_sum_plant_0.apar_sum)
-
-
-plant_df_0_avg = combine(groupby(plant_df_0, :date), :apar => mean => :apar_mean)
-plant_df_avg = combine(groupby(plant_df, :date), :apar => mean => :apar_mean)
-
-horizontal_design_compared_to_ref = (sum(plant_df_0_avg.apar_mean) / sum(plant_df_avg.apar_mean) * 100) - 100

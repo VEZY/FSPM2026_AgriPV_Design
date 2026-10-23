@@ -32,3 +32,5 @@ function _agripv_restore_light_timestep!(table, day)
     table.timestep = [lookup[stamp] for stamp in stamps]
     return table
 end
+
+isdefined(@__MODULE__, :foreach_saved_output_batch) || include("parquet_output_io.jl")
