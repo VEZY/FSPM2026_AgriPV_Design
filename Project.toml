@@ -34,7 +34,6 @@ TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 
 [sources]
 Agrivoltaics = {rev = "main", url = "https://github.com/VEZY/Agrivoltaics.jl#codev"}
-ArchimedLight = {path = "C:\\Users\\CC268161.INTRA\\.julia\\dev\\ArchimedLight"}
 PlantBiophysics = {rev = "fix-root-in-fvcb", url = "https://github.com/VEZY/PlantBiophysics.jl"}
 PlantSimEngine = {rev = "codex/adaptive-subtree-selectors", url = "https://github.com/VirtualPlantLab/PlantSimEngine.jl"}
 
