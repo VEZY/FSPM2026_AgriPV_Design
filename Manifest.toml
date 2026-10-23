@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "b6382c1ea7ab174c24c081a287adbf7a3f7ed519"
+project_hash = "3d754f7a088524a9ef671a027df9955911e4693f"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -121,9 +121,7 @@ version = "0.4.2"
 
 [[deps.ArchimedLight]]
 deps = ["Adapt", "CSV", "Dates", "GeometryBasics", "KernelAbstractions", "LinearAlgebra", "MultiScaleTreeGraph", "OrderedCollections", "PlantGeom", "PlantMeteo", "Serialization", "StaticArrays", "Tables", "YAML"]
-git-tree-sha1 = "d02b159ba178eb9a7898c16764287fa201cd9db1"
-repo-rev = "codex/reuse-scene-node-index"
-repo-url = "https://github.com/VEZY/ArchimedLight.jl"
+path = "C:\\Users\\CC268161.INTRA\\.julia\\dev\\ArchimedLight"
 uuid = "ca362a0f-208d-4994-8e0e-d922fd0d438a"
 version = "0.2.0"
 weakdeps = ["Makie", "PlantSimEngine"]
