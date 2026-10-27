@@ -172,4 +172,4 @@ begin
     # hidedecorations!(ax_inset)
 end
 
-save("2_outputs/simple_plant_scene_light_scat_repeated_plant_nx=ny=$(ground_res).png", f, update=false, px_per_unit=3.0)
+save("2_outputs/simple_plant_scene_light_scat_repeated_plant_nx=ny=$(ground_res)_2.png", f, update=false, px_per_unit=3.0)

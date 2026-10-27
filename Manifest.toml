@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.13.2"
+julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "28e1acf4e6472ffd97d31c56b0f4bba0eee8fdab"
+project_hash = "a3c39a028ad77e9c91d975b04597277270ffb888"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -101,7 +101,7 @@ version = "1.2.0"
 deps = ["CoordinateTransformations", "GeometryBasics", "LinearAlgebra", "MultiScaleTreeGraph", "PlantGeom", "Rotations"]
 git-tree-sha1 = "e7b606eab44d737119162461011b1a2ef157075f"
 repo-rev = "main"
-repo-url = "https://github.com/VEZY/Agrivoltaics.jl#codev"
+repo-url = "https://github.com/VEZY/Agrivoltaics.jl"
 uuid = "a76708df-810c-5d94-8c20-3bbd1247032c"
 version = "0.1.0"
 
@@ -136,7 +136,8 @@ version = "0.4.2"
 
 [[deps.ArchimedLight]]
 deps = ["Adapt", "CSV", "Dates", "GeometryBasics", "KernelAbstractions", "LinearAlgebra", "MultiScaleTreeGraph", "OrderedCollections", "PlantGeom", "PlantMeteo", "Serialization", "StaticArrays", "Tables", "YAML"]
-path = "C:\\Users\\CC268161.INTRA\\.julia\\dev\\ArchimedLight"
+git-tree-sha1 = "0042a7943e50fa38896237aea7f2e9f703f212e2"
+registries = "General"
 uuid = "ca362a0f-208d-4994-8e0e-d922fd0d438a"
 version = "0.2.0"
 weakdeps = ["Makie", "PlantSimEngine"]
@@ -978,10 +979,10 @@ version = "0.13.16"
 
 [[deps.GPUCompiler]]
 deps = ["CompilerCaching", "ExprTools", "InteractiveUtils", "LLVM", "Libdl", "Logging", "PrecompileTools", "Preferences", "REPL", "ScopedValues", "TOML", "Tracy", "UUIDs", "tree_sitter_gcn_jll", "tree_sitter_llvm_jll", "tree_sitter_ptx_jll", "tree_sitter_spirv_jll"]
-git-tree-sha1 = "cff194dd4fd2301f4cc63751606b70a0e189d509"
+git-tree-sha1 = "94a0d5795c52b6673bb828ae350daf7ad3e0220d"
 registries = "General"
 uuid = "61eb1bfa-7361-4325-ad38-22787b887f55"
-version = "2.16.0"
+version = "2.18.0"
 
     [deps.GPUCompiler.extensions]
     CthulhuExt = "Cthulhu"
@@ -1100,18 +1101,18 @@ uuid = "3955a311-db13-416c-9275-1d80ed98e5e9"
 version = "0.11.3"
 
 [[deps.HTTP]]
-deps = ["Base64", "CodecZlib", "Dates", "EnumX", "Logging", "PrecompileTools", "Random", "Reseau", "SHA", "URIs", "UUIDs", "Zlib_jll"]
-git-tree-sha1 = "97241f43b1c0f24356e19cbc547560070a7026b2"
+deps = ["Base64", "CodecZlib", "Dates", "EnumX", "Logging", "PrecompileTools", "Random", "Reseau", "SHA", "TranscodingStreams", "URIs", "UUIDs", "Zlib_jll"]
+git-tree-sha1 = "77e716661f5e911a9eca3297b80be7df847e3fdd"
 registries = "General"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "2.12.1"
+version = "2.12.3"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
-git-tree-sha1 = "9e544f0758a2341e7e782fde6f3f67610366661c"
+git-tree-sha1 = "f700c32c1e9e11b576592043f270e6b33868a56f"
 registries = "General"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
-version = "100.14006.0+0"
+version = "100.15000.0+0"
 
 [[deps.HashArrayMappedTries]]
 git-tree-sha1 = "2eaa69a7cab70a52b9687c8bf950a5a93ec895ae"
@@ -1147,10 +1148,10 @@ version = "2.15.0+0"
 
 [[deps.HypergeometricFunctions]]
 deps = ["Gamma", "LinearAlgebra"]
-git-tree-sha1 = "31bb6c92405c084617facc1d7ed9eb6c402d061e"
+git-tree-sha1 = "c28dceeadc1c9c699656a3ac9d63f79cfaa17472"
 registries = "General"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
-version = "0.3.30"
+version = "0.3.31"
 
 [[deps.ImageAxes]]
 deps = ["AxisArrays", "ImageBase", "ImageCore", "Reexport", "SimpleTraits"]
@@ -1479,7 +1480,7 @@ version = "1.0.0"
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "Zlib_jll", "Zstd_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "8.22.0+0"
+version = "8.18.0+1"
 
 [[deps.LibGit2]]
 deps = ["LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
@@ -1489,7 +1490,7 @@ version = "1.11.0"
 [[deps.LibGit2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "PCRE2_jll", "Zlib_jll"]
 uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
-version = "1.9.7+0"
+version = "1.9.1+0"
 
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl", "OpenSSL_jll", "Zlib_jll"]
@@ -1803,7 +1804,7 @@ version = "0.8.7+0"
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
-version = "3.5.8+0"
+version = "3.5.6+0"
 
 [[deps.OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
@@ -1908,11 +1909,10 @@ version = "0.3.3"
 
 [[deps.PlantBiophysics]]
 deps = ["CSV", "DataFrames", "Dates", "LsqFit", "OrderedCollections", "PlantMeteo", "PlantSimEngine", "RecipesBase", "Statistics", "YAML"]
-git-tree-sha1 = "cded22e133a2660910772dea8b829adfc1222dec"
-repo-rev = "fix-root-in-fvcb"
-repo-url = "https://github.com/VEZY/PlantBiophysics.jl"
+git-tree-sha1 = "47d2c072cd5bd1f14a5297ec000265c8543246df"
+registries = "General"
 uuid = "7ae8fcfa-76ad-4ec6-9ea7-5f8f5e2d6ec9"
-version = "0.18.0"
+version = "0.18.1"
 
     [deps.PlantBiophysics.extensions]
     PlantBiophysicsMonteCarloMeasurementsExt = "MonteCarloMeasurements"
@@ -1946,11 +1946,10 @@ version = "0.9.1"
 
 [[deps.PlantSimEngine]]
 deps = ["CSV", "DataFrames", "Dates", "InteractiveUtils", "JSON", "Markdown", "MultiScaleTreeGraph", "PlantMeteo", "Random", "Statistics", "Tables", "Term"]
-git-tree-sha1 = "6b53a74f1a6c016b8980754ba5aa4538a0a7336c"
-repo-rev = "codex/adaptive-subtree-selectors"
-repo-url = "https://github.com/VirtualPlantLab/PlantSimEngine.jl"
+git-tree-sha1 = "0c8145de2523dede1ff9c21746173afae62d1677"
+registries = "General"
 uuid = "9a576370-710b-4269-adf9-4f603a9c6423"
-version = "0.15.0"
+version = "0.15.1"
 weakdeps = ["HTTP"]
 
     [deps.PlantSimEngine.extensions]
@@ -2230,10 +2229,10 @@ version = "3.9.0+2"
 
 [[deps.SPIRVIntrinsics]]
 deps = ["ExprTools", "GPUToolbox", "LLVM", "UnsafeAtomics"]
-git-tree-sha1 = "7cde80197efe1524e9bac553a1aa4c32e52836c1"
+git-tree-sha1 = "24aeb6431481bb68b18222dc2b61dadc8795b9a6"
 registries = "General"
 uuid = "71d1d633-e7e8-4a92-83a1-de8814b09ba8"
-version = "1.5.0"
+version = "1.5.1"
 weakdeps = ["GPUCompiler", "SIMD", "SpecialFunctions"]
 
     [deps.SPIRVIntrinsics.extensions]
@@ -2885,7 +2884,7 @@ version = "2.6.1"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.3.2+0"
+version = "1.3.1+2"
 
 [[deps.Zstd_jll]]
 deps = ["CompilerSupportLibraries_jll", "Libdl"]
@@ -2984,19 +2983,19 @@ version = "1.6.1+0"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.70.0+0"
+version = "1.67.1+0"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.8.3+0"
+version = "17.8.2+0"
 
 [[deps.pocl_standalone_jll]]
 deps = ["Artifacts", "Hwloc_jll", "JLLWrappers", "Libdl", "SLEEF_jll", "Zstd_jll"]
-git-tree-sha1 = "4264c25d90d651adca9ab3d6a2cfc130adf3cc8e"
+git-tree-sha1 = "73b5a5d7396f178c1b48b10cbea6002ae5b94039"
 registries = "General"
 uuid = "54f56a70-6062-5590-a942-1226658f6c83"
-version = "7.2.2+13"
+version = "7.2.3+0"
 
 [[deps.tree_sitter_gcn_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

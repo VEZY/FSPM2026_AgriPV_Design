@@ -119,26 +119,64 @@ function day_simulation(; panel_length=4.2, panel_inclination=25.0, models, mete
         ignore_nothing=true
     )
 
-    # Simulate energy balance and photosynthesis with PlantBiophysics::
-    vars = Dict{Symbol,Any}(:Leaf => (:Tₗ, :A, :Gₛ))
-    models =
-        ModelMapping(
-            "Leaf" => (
-                Translucent(), # This model reads ArchimedLight outputs one time-step at a time
-                Monteith(),
-                Fvcb(),
-                Medlyn(0.03, 12.0),
-                Status(d=0.01) #! update this with the true value in the MTG
-            ),
+    # PlantSimEngine 0.15.1 runs MTGs through CompositeModel. Rebuild the
+    # one-step model so each precomputed light timestep is supplied as scalars.
+    leaf_applications = (
+        ModelSpec(Monteith(); name=:energy_balance, on=Many(scale=:Leaf)),
+        ModelSpec(Fvcb(); name=:photosynthesis, on=Many(scale=:Leaf)),
+        ModelSpec(Medlyn(0.03, 12.0); name=:stomatal_conductance, on=Many(scale=:Leaf)),
+    )
+    previous_status = Dict{Int,NamedTuple}()
+    for (timestep, forcing) in enumerate(meteo)
+        initial_status = node -> begin
+            if symbol(node) == :Leaf
+                id = node_id(node)
+                previous = get(previous_status, id, nothing)
+                leaf_temperature = isnothing(previous) ? forcing.T - 0.2 : previous.Tₗ
+                par_flux = node[:Ra_PAR_f][timestep]
+                nir_flux = node[:Ra_NIR_f][timestep]
+                Status(
+                    aPPFD=par_flux * PlantMeteo.Constants().J_to_umol,
+                    Ra_SW_f=par_flux + nir_flux,
+                    sky_fraction=node[:sky_fraction][timestep],
+                    d=0.01,
+                    Tₗ=leaf_temperature,
+                    Cₛ=forcing.Cₐ,
+                    A=isnothing(previous) ? 0.0 : previous.A,
+                    Gₛ=isnothing(previous) ? 0.03 : previous.Gₛ,
+                    Dₗ=PlantMeteo.e_sat(leaf_temperature) -
+                        PlantMeteo.e_sat(forcing.T) * forcing.Rh,
+                )
+            else
+                Status()
+            end
+        end
+        coupled = CompositeModel(
+            scene.mtg;
+            applications=leaf_applications,
+            environment=forcing,
+            status=initial_status,
         )
-    outs = PlantSimEngine.run!(scene.mtg, models, meteo, tracked_outputs=vars)
-    # Writing the outputs back to the MTG for visualization:
-    for ts_node in groupby(DataFrame(outs[:Leaf]), :node)
-        node = ts_node.node[1]
-        node.Tₗ = ts_node.Tₗ
-        node.A = ts_node.A
-        node.A_per_organ = ts_node.A .* node.area
-        node.Gₛ = ts_node.Gₛ
+        PlantSimEngine.run!(coupled; steps=1, outputs=:none)
+
+        for leaf in PlantSimEngine.model_objects(coupled; scale=:Leaf)
+            node = PlantSimEngine.source_node(coupled, leaf.id)
+            state = leaf.status
+            id = node_id(node)
+            previous_status[id] = (; state.Tₗ, state.A, state.Gₛ)
+            area = node[:area][timestep]
+            if timestep == 1
+                node.Tₗ = [state.Tₗ]
+                node.A = [state.A]
+                node.Gₛ = [state.Gₛ]
+                node.A_per_organ = [state.A * area]
+            else
+                push!(node.Tₗ, state.Tₗ)
+                push!(node.A, state.A)
+                push!(node.Gₛ, state.Gₛ)
+                push!(node.A_per_organ, state.A * area)
+            end
+        end
     end
 
     # Compute the absorbed PAR and A by each plant over the day, by summing the absorbed PAR energy of all the leaves of each plant at each timestep:
@@ -163,83 +201,76 @@ scene_ref, series_ref, plant_df_ref = day_simulation(panel_length=4.2, panel_inc
 # Same GCR, different structure:
 scene_0, series_0, plant_df_0 = day_simulation(panel_length=3.8, panel_inclination=0.0, models=models, meteo=row, options=options)
 
-# Make the plot with the incident PAR on the tiled geometry of the noon timestep,
+# Plot incident PAR on the simulated scene for the noon timestep,
 # and an inset with the plant geometry colored in green,
 # and the daily absorbed PAR by the crop:
 wheat_plant = read_opf("0_simulations/archicrop/wheat/static/plant_1995-06-24.opf", mtg_type=NodeMTG)
-tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=40, ny=3)
-tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=40, ny=3)
-# tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=1, ny=1)
-# tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=1, ny=1)
+tiled_ref = ArchimedLight.tile_light_geometry(scene_ref, series_ref; nx=4, ny=3)
+tiled_0 = ArchimedLight.tile_light_geometry(scene_0, series_0; nx=4, ny=3)
 
-begin
-    f = Figure(size=(900, 700))
-    ax1 = Axis3(
-        f[1:2, 1:2],
-        aspect=:data,
-        title="A. Incident PAR at 12:00 on design 1",
-        xlabel="x (m)",
-        ylabel="y (m)",
-        zlabel="z (m)",
-        # azimuth=0.0,
-    )
-    p = ArchimedLight.lightplot!(ax1, tiled_ref, series_ref; color=:Ri_PAR_f, colormap=:thermal, timestep=12)
+f = Figure(size=(900, 700))
+ax1 = Axis3(
+    f[1:2, 1:2],
+    aspect=:data,
+    title="A. Incident PAR at 12:00 on design 1",
+    xlabel="x (m)",
+    ylabel="y (m)",
+    zlabel="z (m)",
+)
+p = ArchimedLight.lightplot!(ax1, tiled_ref, series_ref; color=:Ri_PAR_f, colormap=:thermal, timestep=12)
 
-    ax2 = Axis3(
-        f[1:2, 3:4],
-        aspect=:data,
-        title="B. Incident PAR at 12:00 on design 2",
-        xlabel="x (m)",
-        ylabel="y (m)",
-        zlabel="z (m)",
-        # azimuth=0.0
-    )
-    zlims!(ax2, zmin(scene_ref.mtg), zmax(scene_ref.mtg)) # Set the same z limits for both plots to make them comparable
-    p = ArchimedLight.lightplot!(ax2, tiled_0, series_0; color=:Ri_PAR_f, colormap=:thermal, timestep=12)
+ax2 = Axis3(
+    f[1:2, 3:4],
+    aspect=:data,
+    title="B. Incident PAR at 12:00 on design 2",
+    xlabel="x (m)",
+    ylabel="y (m)",
+    zlabel="z (m)",
+)
+zlims!(ax2, zmin(scene_ref.mtg), zmax(scene_ref.mtg)) # Set the same z limits for both plots to make them comparable
+p = ArchimedLight.lightplot!(ax2, tiled_0, series_0; color=:Ri_PAR_f, colormap=:thermal, timestep=12)
 
-    # Plant alone:
-    ax_3 = Axis3(
-        f[3, 1:2],
-        aspect=:data,
-        title="C. Individual wheat plant",
-        xticks=[-0.2, 0.2],
-        yticks=[-0.2, 0.2],
-        xlabel="x (m)",
-        ylabel="y (m)",
-        zlabel="z (m)",
-    )
+# Plant alone:
+ax_3 = Axis3(
+    f[3, 1:2],
+    # f[1, 1],
+    aspect=:data,
+    title="C. Individual wheat plant",
+    xticks=[-0.2, 0.2],
+    yticks=[-0.2, 0.2],
+    xlabel="x (m)",
+    ylabel="y (m)",
+    zlabel="z (m)",
+)
 
-    plantviz!(
-        ax_3,
-        wheat_plant;
-        color=:green,
-    )
+plantviz!(
+    ax_3,
+    wheat_plant;
+    color=:green,
+)
 
-    Colorbar(f[1:2, 5], p, label="Incident PAR (W m⁻²)")
+Colorbar(f[1:2, 5], p, label="Incident PAR (W m⁻²)")
 
-    ax4 = Axis(f[3, 3:5], title="D. Assimilation per plant over the day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)", xticks=0:2:24)
-    plt = data(plant_df_ref) *
-        mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
-        visual(Lines, alpha=0.05)
-    plant_df_ref_avg = combine(groupby(plant_df_ref, :date), :assimilation => mean => :assimilation_mean)
-    plt_avg = data(plant_df_ref_avg) *
-        mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
-        visual(Lines, color=:red, linewidth=3)
-    plt_0 = data(plant_df_0) *
-        mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
-        visual(Lines, alpha=0.05, color=:black, linestyle=:dash)
-    plant_df_0_avg = combine(groupby(plant_df_0, :date), :assimilation => mean => :assimilation_mean)
-    plt_avg_0 = data(plant_df_0_avg) *
-        mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
-        visual(Lines, color=:red, linewidth=3, linestyle=:dash)
+ax4 = Axis(f[3, 3:5], title="D. Assimilation per plant over the day", xlabel="Time of day", ylabel="A (μmol plant⁻¹ hour⁻¹)", xticks=0:2:24)
+plt = data(plant_df_ref) *
+    mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
+    visual(Lines, alpha=0.05)
+plant_df_ref_avg = combine(groupby(plant_df_ref, :date), :assimilation => mean => :assimilation_mean)
+plt_avg = data(plant_df_ref_avg) *
+    mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
+    visual(Lines, color=:red, linewidth=3)
+plt_0 = data(plant_df_0) *
+    mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation, group=:plant_id) *
+    visual(Lines, alpha=0.05, color=:black, linestyle=:dash)
+plant_df_0_avg = combine(groupby(plant_df_0, :date), :assimilation => mean => :assimilation_mean)
+plt_avg_0 = data(plant_df_0_avg) *
+    mapping(:date => (x -> Hour(x).value) => "Hour", :assimilation_mean) *
+    visual(Lines, color=:red, linewidth=3, linestyle=:dash)
 
-    draw!(ax4, plt + plt_0 + plt_avg + plt_avg_0)
-    # draw!(ax4, plt)
+draw!(ax4, plt + plt_0 + plt_avg + plt_avg_0)
+f
 
-    # hidedecorations!(ax_inset)
-    f
-end
-save("2_outputs/daily_apar_crop_3d.png", f, update=false, px_per_unit=3.0)
+save("2_outputs/daily_apar_crop_3d_2026-10-27.png", f, update=false, px_per_unit=3.0)
 
 
 CSV.write("2_outputs/daily_apar_crop_horizontal_design.csv", plant_df_0)
